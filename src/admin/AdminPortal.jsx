@@ -101,7 +101,7 @@ export const ADMIN_TABS = [
   ['donations', 'Donations', HeartHandshake, Donations],
   ['events', 'Events & Achievements', CalendarDays, EventsAdmin],
   ['users', 'Manage Portals', Users, UsersAdmin],
-  ['location', 'Location, Committee & Help Desk', MapPin, LocationAdmin],
+  ['location', 'Location & Committee', MapPin, LocationAdmin],
   ['rental', 'Rental Cart', ShoppingCart, RentalAdmin],
   ['chitty', 'Chitty Money', Coins, ChittyAdmin],
   ['auction', 'Live Auction', Gavel, AuctionAdmin],
@@ -132,7 +132,7 @@ export default function AdminPortal({ tab }) {
           <nav className="flex lg:flex-col gap-0.5 overflow-x-auto">
             {ADMIN_TABS.map(([id, label, Icon]) => (
               <button key={id} onClick={() => navigate('/admin/' + id)} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm whitespace-nowrap text-left ${current[0] === id ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-                <Icon size={16} /> <span className="flex-1">{label}</span>
+                <Icon size={16} className="shrink-0" /> <span className="flex-1">{label}</span>
                 {badges[id] ? <span className={`badge ${current[0] === id ? 'bg-white text-brand-700' : 'bg-red-500 text-white'}`}>{badges[id]}</span> : null}
               </button>
             ))}

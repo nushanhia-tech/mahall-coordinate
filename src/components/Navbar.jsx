@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, Moon } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { navigate } from '../router';
 
@@ -23,7 +23,7 @@ export default function Navbar({ path }) {
     <header className="bg-brand-800 text-white sticky top-0 z-40 shadow print:hidden">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <button onClick={() => go('/')} className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-full bg-gold-400 text-brand-900 grid place-items-center font-black">☪</div>
+          <div className="w-9 h-9 rounded-full bg-gold-400 text-brand-900 grid place-items-center"><Moon size={18} fill="currentColor" /></div>
           <div className="text-left leading-tight">
             <div className="font-bold">{state.masjid.name}</div>
             <div className="text-[10px] uppercase tracking-wider text-brand-100">Mahall Coordinating System</div>

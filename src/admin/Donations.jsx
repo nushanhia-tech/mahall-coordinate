@@ -30,7 +30,7 @@ function Queue() {
 
   return (
     <div className="card">
-      <div className="flex gap-2 mb-4">{['pending', 'approved', 'rejected', ''].map((s) => <button key={s} onClick={() => setStatus(s)} className={`btn-sm btn ${status === s ? 'bg-brand-600 text-white' : 'bg-slate-100'}`}>{s || 'All'}</button>)}</div>
+      <div className="flex gap-2 mb-4">{['pending', 'approved', 'rejected', ''].map((s) => <button key={s} onClick={() => setStatus(s)} className={`btn-sm btn capitalize ${status === s ? 'bg-brand-600 text-white' : 'bg-slate-100'}`}>{s || 'All'}</button>)}</div>
       <div className="overflow-x-auto">
         <table className="table">
           <thead><tr><th>Date</th><th>Donor</th><th>Fund</th><th className="text-right">Amount</th><th>Proof</th><th>Status</th><th /></tr></thead>
