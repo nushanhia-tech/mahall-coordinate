@@ -5,10 +5,10 @@ import { CrudManager, Tabs, StatusBadge, Empty } from '../components/ui';
 import { fmtDate, fmtDateTime, inr } from '../utils/format';
 
 export function CourseApplications({ institutionId }) {
-  const { state, patch, toast } = useApp();
+  const { state, patch, toast, ask } = useApp();
   const courses = state.courses.filter((c) => !institutionId || c.institutionId === institutionId);
   const list = state.courseApplications.filter((a) => courses.some((c) => c.id === a.courseId)).sort((a, b) => b.date.localeCompare(a.date));
-  const decide = (a, status) => { const remark = status === 'rejected' ? prompt('Reason (optional)') || '' : ''; patch('courseApplications', a.id, { status, remark }); toast(`Application ${status}`); };
+  const decide = async (a, status) => { let remark = ''; if (status === 'rejected') { remark = await ask({ title: 'Reject application', message: 'Reason (optional)', input: true, danger: true, okLabel: 'Reject' }); if (remark === null) return; } patch('courseApplications', a.id, { status, remark }); toast(`Application ${status}`); };
   return (
     <div className="card overflow-x-auto">
       <table className="table">

@@ -103,7 +103,7 @@ export default function ChittyPage() {
 }
 
 export function ChittyAdmin() {
-  const { state, add, patch, remove, update, toast } = useApp();
+  const { state, add, patch, remove, update, toast, ask } = useApp();
   const c = state.chitty;
   const [tab, setTab] = useState('monthly');
   const [month, setMonth] = useState(() => currentChittyMonth(c));
@@ -114,7 +114,7 @@ export function ChittyAdmin() {
   const months = Array.from({ length: c.months }, (_, i) => i + 1);
 
   const confirmPay = (p) => { patch('chittyPayments', p.id, { status: 'confirmed', decidedAt: new Date().toISOString() }); toast(`Confirmed ${mem(p.memberId)?.code} month ${p.month}`); };
-  const rejectPay = (p) => { const remark = prompt('Reason for rejection') ?? ''; patch('chittyPayments', p.id, { status: 'rejected', remark }); toast('Payment rejected', 'info'); };
+  const rejectPay = async (p) => { const remark = await ask({ title: 'Reject payment', message: 'Reason for rejection', input: true, danger: true, okLabel: 'Reject' }); if (remark === null) return; patch('chittyPayments', p.id, { status: 'rejected', remark }); toast('Payment rejected', 'info'); };
   const cash = (memberId, m) => { add('chittyPayments', { memberId, month: m, amount: c.monthlyAmount, method: 'cash', screenshot: '', status: 'confirmed', date: new Date().toISOString() }); toast('Cash payment recorded'); };
 
   const monthRows = state.chittyMembers.map((m) => ({ m, p: payFor(state, m.id, month) }));

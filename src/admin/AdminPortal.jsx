@@ -71,7 +71,7 @@ function Overview() {
 }
 
 function SettingsTab() {
-  const { resetDemo, toast, state } = useApp();
+  const { resetDemo, toast, state, ask } = useApp();
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mahall-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
@@ -88,7 +88,7 @@ function SettingsTab() {
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" onClick={exportData}>Download backup (JSON)</button>
         <label className="btn-outline cursor-pointer">Restore backup<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files[0] && importData(e.target.files[0])} /></label>
-        <button className="btn-danger" onClick={() => { if (confirm('Reset all data to the demo data? This cannot be undone.')) { resetDemo(); toast('Demo data restored'); } }}>Reset demo data</button>
+        <button className="btn-danger" onClick={async () => { if (await ask({ title: 'Reset demo data?', message: 'All current data will be replaced with the demo data. This cannot be undone.', danger: true, okLabel: 'Reset' })) { resetDemo(); toast('Demo data restored'); } }}>Reset demo data</button>
       </div>
     </div>
   );

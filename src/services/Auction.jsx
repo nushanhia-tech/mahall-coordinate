@@ -119,7 +119,7 @@ export default function AuctionPage() {
 }
 
 export function AuctionAdmin() {
-  const { state, add, patch, remove, update, toast } = useApp();
+  const { state, add, patch, remove, update, toast, ask } = useApp();
   const now = useNow();
   const [bidsOf, setBidsOf] = useState(null);
   const toLocal = (iso) => { const d = new Date(iso); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
@@ -138,7 +138,7 @@ export function AuctionAdmin() {
       ],
     }, `auction-${a.id}.pdf`);
   };
-  const endNow = (a) => { if (!confirm(`End "${a.name}" now?`)) return; patch('auctionItems', a.id, { status: 'ended', endedAt: new Date().toISOString(), endsAt: new Date().toISOString() }); toast('Auction ended'); };
+  const endNow = async (a) => { if (!(await ask({ title: 'End auction now?', message: `Bidding on "${a.name}" will close immediately.`, danger: true, okLabel: 'End now' }))) return; patch('auctionItems', a.id, { status: 'ended', endedAt: new Date().toISOString(), endsAt: new Date().toISOString() }); toast('Auction ended'); };
   const postIncome = (a) => {
     const t = topBid(a); if (!t) return;
     update((s) => { s.transactions.push({ id: 'txn_' + a.id, date: new Date().toISOString().slice(0, 10), type: 'income', head: s.accountHeads.includes('Nercha Fund') ? 'Nercha Fund' : s.accountHeads[0], amount: t.amount, description: `Auction – ${a.name} – ${t.bidder}`, receipt: '' }); s.auctionItems.find((x) => x.id === a.id).posted = true; });
@@ -176,7 +176,7 @@ export function AuctionAdmin() {
             <table className="table"><thead><tr><th>Bidder</th><th>Phone</th><th>Amount</th><th>Time</th><th /></tr></thead>
               <tbody>{[...watched.bids].sort((a, b) => b.amount - a.amount).map((b) => (
                 <tr key={b.id}><td>{b.bidder}</td><td>{b.phone}</td><td className="font-semibold">{inr(b.amount)}</td><td className="text-xs">{fmtDateTime(b.time)}</td>
-                  <td className="text-right"><button className="p-1 text-slate-400 hover:text-red-600" title="Remove bad bid" onClick={() => { if (confirm('Remove this bid?')) { update((s) => { const a = s.auctionItems.find((x) => x.id === watched.id); a.bids = a.bids.filter((x) => x.id !== b.id); }); toast('Bid removed'); } }}><Trash2 size={14} /></button></td></tr>
+                  <td className="text-right"><button className="p-1 text-slate-400 hover:text-red-600" title="Remove bad bid" onClick={async () => { if (await ask({ title: 'Remove this bid?', message: `${b.bidder} – ${inr(b.amount)}`, danger: true, okLabel: 'Remove' })) { update((s) => { const a = s.auctionItems.find((x) => x.id === watched.id); a.bids = a.bids.filter((x) => x.id !== b.id); }); toast('Bid removed'); } }}><Trash2 size={14} /></button></td></tr>
               ))}</tbody></table>
             {!watched.bids.length && <Empty>No bids.</Empty>}
             <div className="flex gap-2"><StatusBadge status={isLive(watched, now) ? 'live' : 'ended'} /></div>

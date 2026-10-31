@@ -7,7 +7,7 @@ import { withRunningBalance, sumBy, periodRange } from '../utils/finance';
 import { downloadPdf } from '../utils/pdf';
 
 function Ledger() {
-  const { state, add, patch, remove, toast } = useApp();
+  const { state, add, patch, remove, toast, ask } = useApp();
   const [form, setForm] = useState(null);
   const [view, setView] = useState('');
   const [filter, setFilter] = useState({ type: '', head: '' });
@@ -49,7 +49,7 @@ function Ledger() {
                 <td>{t.receipt ? <button className="text-brand-700" onClick={() => setView(t.receipt)} title="View bill"><Paperclip size={15} /></button> : '—'}</td>
                 <td className="whitespace-nowrap text-right">
                   <button className="p-1 text-slate-500 hover:text-brand-700" onClick={() => setForm({ ...t })}><Pencil size={14} /></button>
-                  <button className="p-1 text-slate-500 hover:text-red-600" onClick={() => { if (confirm('Delete entry?')) { remove('transactions', t.id); toast('Entry deleted'); } }}><Trash2 size={14} /></button>
+                  <button className="p-1 text-slate-500 hover:text-red-600" onClick={async () => { if (await ask({ title: 'Delete entry?', message: `${t.description} – ${inr(t.amount)}`, danger: true, okLabel: 'Delete' })) { remove('transactions', t.id); toast('Entry deleted'); } }}><Trash2 size={14} /></button>
                 </td>
               </tr>
             ))}
@@ -78,7 +78,7 @@ function Ledger() {
 }
 
 function Heads() {
-  const { state, update, toast } = useApp();
+  const { state, update, toast, ask } = useApp();
   const [name, setName] = useState('');
   const used = (h) => state.transactions.some((t) => t.head === h) || state.donationChannels.some((c) => c.accountHead === h);
   const addHead = (e) => {
@@ -87,8 +87,8 @@ function Heads() {
     if (!n || state.accountHeads.includes(n)) return toast('Enter a new, unique name', 'error');
     update((s) => { s.accountHeads.push(n); }); setName(''); toast('Account head added');
   };
-  const rename = (h) => {
-    const n = prompt('New name for ' + h, h)?.trim();
+  const rename = async (h) => {
+    const n = (await ask({ title: `Rename ${h}`, input: true, required: true, defaultValue: h, okLabel: 'Rename' }))?.trim();
     if (!n || n === h) return;
     if (state.accountHeads.includes(n)) return toast('That name exists', 'error');
     update((s) => {

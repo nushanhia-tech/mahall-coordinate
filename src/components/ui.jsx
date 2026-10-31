@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Plus, Pencil, Trash2, Upload, Search } from 'lucide-react';
 import { readImage } from '../utils/format';
+import { useApp } from '../store/AppContext';
 
 export function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
@@ -76,6 +77,7 @@ export const StatCard = ({ icon: Icon, label, value, color = 'brand' }) => {
 // Generic add/edit/delete table driven by a field list.
 // field: { name, label, type: text|number|date|time|textarea|select|image|password, options, required, table (show in table), render }
 export function CrudManager({ title, items, fields, onAdd, onUpdate, onDelete, defaults = {}, searchKeys, extraActions, canDelete = () => true, addLabel = 'Add' }) {
+  const { ask } = useApp();
   const [editing, setEditing] = useState(null);
   const [q, setQ] = useState('');
   const cols = fields.filter((f) => f.table !== false);
@@ -117,7 +119,7 @@ export function CrudManager({ title, items, fields, onAdd, onUpdate, onDelete, d
                 <td className="text-right whitespace-nowrap">
                   {extraActions?.(it)}
                   <button className="p-1.5 text-slate-500 hover:text-brand-700" title="Edit" onClick={() => setEditing({ ...it })}><Pencil size={15} /></button>
-                  {canDelete(it) && <button className="p-1.5 text-slate-500 hover:text-red-600" title="Delete" onClick={() => { if (confirm('Delete this record?')) onDelete(it.id); }}><Trash2 size={15} /></button>}
+                  {canDelete(it) && <button className="p-1.5 text-slate-500 hover:text-red-600" title="Delete" onClick={async () => { if (await ask({ title: 'Delete record?', message: 'This cannot be undone.', danger: true, okLabel: 'Delete' })) onDelete(it.id); }}><Trash2 size={15} /></button>}
                 </td>
               </tr>
             ))}
