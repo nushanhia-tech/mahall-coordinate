@@ -5,6 +5,7 @@ import { Tabs, Modal, Field, ImageInput, StatusBadge, Empty } from '../component
 import { inr, pdfInr, today, fmtDate } from '../utils/format';
 import { withRunningBalance, sumBy, periodRange } from '../utils/finance';
 import { downloadPdf } from '../utils/pdf';
+import { saveFile } from '../utils/download';
 
 function Ledger() {
   const { state, add, patch, remove, toast, ask } = useApp();
@@ -71,7 +72,7 @@ function Ledger() {
         )}
       </Modal>
       <Modal open={!!view} onClose={() => setView('')} title="Bill / Receipt" wide>
-        {view.startsWith('data:image') ? <img src={view} alt="bill" className="max-h-[70vh] mx-auto" /> : <a href={view} download="bill" className="btn-primary">Download file</a>}
+        {view.startsWith('data:image') ? <img src={view} alt="bill" className="max-h-[70vh] mx-auto" /> : <button className="btn-primary" onClick={() => fetch(view).then((r) => r.blob()).then((b) => saveFile('bill.pdf', b))}>Download file</button>}
       </Modal>
     </div>
   );

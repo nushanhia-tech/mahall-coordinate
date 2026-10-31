@@ -3,6 +3,7 @@ import { useApp, useStats } from '../store/AppContext';
 import { navigate } from '../router';
 import { StatCard } from '../components/ui';
 import { inr, fmtDateTime } from '../utils/format';
+import { saveFile } from '../utils/download';
 import Households from './Households';
 import Accounts from './Accounts';
 import Donations from './Donations';
@@ -74,7 +75,7 @@ function SettingsTab() {
   const { resetDemo, toast, state, ask } = useApp();
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mahall-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    saveFile(`mahall-backup-${new Date().toISOString().slice(0, 10)}.json`, blob);
   };
   const importData = (file) => {
     const r = new FileReader();

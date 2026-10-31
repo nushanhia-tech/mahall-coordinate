@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { saveFile } from './download';
 
 const GREEN = [4, 120, 87];
 
@@ -75,6 +76,6 @@ export function buildPdf({ org, title, subtitle, blocks = [] }) {
 
 export const downloadPdf = (opts, filename) => {
   const doc = buildPdf(opts);
-  doc.save(filename || `${opts.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`);
+  saveFile(filename || `${opts.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`, doc.output('blob'));
   return doc;
 };
