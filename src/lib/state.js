@@ -4,7 +4,7 @@ import { getUserSession, getChittySession } from './auth';
 import { seed, seedChittyPayments } from '../store/seed';
 import { UNIT_MS } from '../utils/format';
 import { COLLECTIONS, SETTINGS } from './schema';
-import { readCollection, readOne, readSettings, writeSetting, upsertRow, deleteRow, wipeAll } from './repo';
+import { readAll, readOne, writeSetting, upsertRow, deleteRow, wipeAll, insertMany } from './repo';
 
 export { COLLECTIONS, SETTINGS };
 const SECRET_COLLECTIONS = ['users', 'chittyMembers']; // have a hashed `password` field
@@ -16,15 +16,16 @@ const hashIfNeeded = async (p) => (isHash(p) ? p : bcrypt.hash(String(p), 10));
 
 // ---------- seeding ----------
 
+// Writes a whole state into empty tables: one bulk insert per table.
 async function writeAll(tx, state) {
-  for (const key of SETTINGS) await writeSetting(tx, key, state[key]);
-  for (const col of COLLECTIONS) {
-    for (const row of state[col] || []) {
-      const data = { ...row };
-      if (SECRET_COLLECTIONS.includes(col) && data.password) data.password = await hashIfNeeded(data.password);
-      await upsertRow(tx, col, data);
-    }
+  // Hash passwords first (the same demo password is hashed once).
+  const cache = new Map();
+  const hash = async (p) => { if (isHash(p)) return p; if (!cache.has(p)) cache.set(p, await bcrypt.hash(String(p), 10)); return cache.get(p); };
+  for (const col of SECRET_COLLECTIONS) {
+    state[col] = await Promise.all((state[col] || []).map(async (r) => ({ ...r, password: await hash(r.password || 'changeme123') })));
   }
+  for (const key of SETTINGS) await writeSetting(tx, key, state[key]);
+  for (const col of COLLECTIONS) await insertMany(tx, col, state[col] || []);
 }
 
 export const demoState = () => { const s = seed(); s.chittyPayments = seedChittyPayments(s); return s; };
@@ -55,11 +56,7 @@ export async function replaceAll(state) {
 
 export async function loadRaw() {
   await ensureSeeded();
-  return sql.begin('read only', async (tx) => {
-    const state = await readSettings(tx);
-    for (const c of COLLECTIONS) state[c] = await readCollection(tx, c);
-    return state;
-  });
+  return readAll(sql);
 }
 
 export async function getContext() {

@@ -3,6 +3,7 @@ import { sql } from '@/lib/db';
 import { findBy } from '@/lib/repo';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 // "My bookings" / "My applications" lookups by phone number.
 export const GET = handle(async (req) => {

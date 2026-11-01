@@ -94,7 +94,7 @@ export async function readSettings(tx) {
 export async function writeSetting(tx, key, value) {
   if (key === 'accountHeads') {
     await tx`delete from account_heads`;
-    for (let i = 0; i < value.length; i++) await tx`insert into account_heads (name, position) values (${value[i]}, ${i})`;
+    if (value.length) await tx`insert into account_heads ${tx(value.map((name, position) => ({ name, position })))}`;
     return;
   }
   const spec = SETTING_SPEC[key];
@@ -111,4 +111,76 @@ export async function writeSetting(tx, key, value) {
 export async function wipeAll(tx) {
   const tables = [...Object.values(COLLECTION_SPEC).map((s) => s.table), ...Object.values(SETTING_SPEC).map((s) => s.table), 'account_heads'];
   await tx.unsafe(`truncate ${tables.map(q).join(', ')} cascade`);
+}
+
+// ---------- fast paths ----------
+
+// Read every table at once (all queries run in parallel), then stitch children onto parents.
+export async function readAll(db) {
+  const jobs = [];
+  for (const [col, spec] of Object.entries(COLLECTION_SPEC)) {
+    jobs.push(db.unsafe(`select "id", "extra", ${selectList(spec.fields)} from ${q(spec.table)} order by created_at, id`).then((rows) => ['parent', col, rows]));
+    for (const [field, child] of Object.entries(spec.children || {})) {
+      const hasId = child.fields.includes('id');
+      jobs.push(db.unsafe(`select parent_id, ${selectList(child.fields.filter((f) => f !== 'id'), hasId ? ['"id"'] : [])} from ${q(child.table)} order by parent_id, position`)
+        .then((rows) => ['child', col, rows, field, child]));
+    }
+  }
+  const settingsJob = readSettings(db);
+  const results = await Promise.all(jobs);
+  const state = await settingsJob;
+
+  const kids = {};
+  for (const [kind, col, rows, field, child] of results) {
+    if (kind !== 'child') continue;
+    const map = new Map();
+    for (const r of rows) {
+      const item = rowFromDb(r, child.fields.filter((f) => f !== 'id'));
+      if (!child.fields.includes('id')) delete item.id;
+      if (!map.has(r.parent_id)) map.set(r.parent_id, []);
+      map.get(r.parent_id).push(item);
+    }
+    (kids[col] ||= {})[field] = map;
+  }
+  for (const [kind, col, rows] of results) {
+    if (kind !== 'parent') continue;
+    const spec = COLLECTION_SPEC[col];
+    state[col] = rows.map((r) => {
+      const obj = rowFromDb(r, spec.fields);
+      for (const field of Object.keys(spec.children || {})) obj[field] = kids[col]?.[field]?.get(r.id) || [];
+      return obj;
+    });
+  }
+  return state;
+}
+
+// Insert many rows of one collection with a single statement per table (used for demo data / restore).
+export async function insertMany(tx, collection, objs) {
+  if (!objs.length) return;
+  const spec = COLLECTION_SPEC[collection];
+  const bulk = async (table, cols, rows) => {
+    for (let start = 0; start < rows.length; start += 200) {
+      const chunk = rows.slice(start, start + 200);
+      const params = [];
+      const values = chunk.map((vals) => `(${vals.map((v) => { params.push(v !== null && typeof v === 'object' ? tx.json(v) : v); return `$${params.length}`; }).join(', ')})`);
+      await tx.unsafe(`insert into ${q(table)} (${cols.map(q).join(', ')}) values ${values.join(', ')}`, params);
+    }
+  };
+  const parentRows = objs.map((o) => {
+    const d = rowToDb(o, spec.fields);
+    for (const field of Object.keys(spec.children || {})) delete d.extra[field];
+    return d;
+  });
+  const cols = ['id', ...Object.keys(parentRows[0])];
+  await bulk(spec.table, cols, parentRows.map((d, i) => [objs[i].id, ...Object.values(d)]));
+  for (const [field, child] of Object.entries(spec.children || {})) {
+    const rows = [];
+    let ccols = null;
+    objs.forEach((o) => (o[field] || []).forEach((item, i) => {
+      const d = rowToDb(item, child.fields, { withExtra: false });
+      ccols ||= ['parent_id', 'position', ...Object.keys(d)];
+      rows.push([o.id, i, ...Object.values(d)]);
+    }));
+    if (rows.length) await bulk(child.table, ccols, rows);
+  }
 }

@@ -5,6 +5,7 @@ import { ensureSeeded, verifyPassword } from '@/lib/state';
 import { setChittySession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const POST = handle(async (req) => {
   const { code = '', password = '' } = await body(req);

@@ -1,6 +1,8 @@
 import { handle, json, body } from '@/lib/api';
 import { getContext, replaceAll, loadRaw, COLLECTIONS, SETTINGS, HttpError } from '@/lib/state';
 
+export const maxDuration = 60;
+
 export const POST = handle(async (req) => {
   const ctx = await getContext();
   if (ctx.role !== 'admin') throw new HttpError(403, 'Admins only');

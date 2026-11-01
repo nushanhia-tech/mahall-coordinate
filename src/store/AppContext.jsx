@@ -24,7 +24,15 @@ function diff(prev, next) {
 }
 
 const api = async (url, opts = {}) => {
-  const res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json' }, cache: 'no-store' });
+  // Give up after 30 seconds so the page shows an error instead of loading forever.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  let res;
+  try {
+    res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json' }, cache: 'no-store', signal: ctrl.signal });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'The server took too long to answer. Open /api/health to see why.' : 'No connection to the server.');
+  } finally { clearTimeout(timer); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;

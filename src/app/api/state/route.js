@@ -2,6 +2,7 @@ import { handle, json } from '@/lib/api';
 import { loadRaw, getContext, sanitize } from '@/lib/state';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const GET = handle(async () => {
   const [raw, ctx] = await Promise.all([loadRaw(), getContext()]);

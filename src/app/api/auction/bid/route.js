@@ -5,6 +5,7 @@ import { readOne } from '@/lib/repo';
 import { uid } from '@/utils/format';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 // Bids go through their own route so two people bidding at once can't overwrite each other.
 export const POST = handle(async (req) => {
