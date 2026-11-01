@@ -12,8 +12,11 @@ export function explain(e) {
   if (code === '42P01') return 'The database tables are missing. Run mahall-database.sql in Supabase → SQL Editor.';
   if (code === '28P01' || /password authentication failed/i.test(msg)) return 'The database password in DATABASE_URL is wrong.';
   if (/tenant or user not found/i.test(msg)) return 'Wrong user name in DATABASE_URL: for the pooler it must be postgres.<project-id> (copy it from Supabase → Connect → Transaction pooler).';
-  if (['ENOTFOUND', 'ENETUNREACH', 'ECONNREFUSED', 'ETIMEDOUT', 'EHOSTUNREACH', 'CONNECT_TIMEOUT'].includes(code) || /db\.[a-z0-9]+\.supabase\.co/.test(url)) {
-    return 'Cannot connect to the database. Use the "Transaction pooler" address from Supabase → Connect (it ends in .pooler.supabase.com:6543/postgres).';
+  if (/@db\.[a-z0-9]+\.supabase\.co/.test(url)) {
+    return 'DATABASE_URL is the "Direct connection" address (db.….supabase.co), which Vercel cannot reach. Use the "Transaction pooler" address from Supabase → Connect (it ends in .pooler.supabase.com:6543/postgres), then Redeploy.';
+  }
+  if (['ENOTFOUND', 'ENETUNREACH', 'ECONNREFUSED', 'ETIMEDOUT', 'EHOSTUNREACH', 'CONNECT_TIMEOUT'].includes(code)) {
+    return `Cannot reach the database server (${code}). Check the server name in DATABASE_URL – copy it again from Supabase → Connect → Transaction pooler.`;
   }
   return `Server error (${code || e?.name || 'unknown'}): ${msg.slice(0, 160)}`;
 }

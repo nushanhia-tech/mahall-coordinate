@@ -3,16 +3,42 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+// What the server is actually using to connect (password hidden).
+function describeUrl() {
+  const raw = process.env.DATABASE_URL || '';
+  if (!raw) return { set: false };
+  try {
+    const u = new URL(raw);
+    return {
+      set: true,
+      user: decodeURIComponent(u.username),
+      host: u.hostname,
+      port: u.port || '5432',
+      database: u.pathname.slice(1),
+      passwordLength: decodeURIComponent(u.password).length,
+      passwordHasBrackets: /^\[.*\]$/.test(decodeURIComponent(u.password)),
+      looksLikePooler: /pooler\.supabase\.com$/.test(u.hostname),
+    };
+  } catch {
+    return { set: true, invalid: 'DATABASE_URL is not a valid address – check for spaces, quotes or missing parts.' };
+  }
+}
+
 // Open /api/health in the browser to check the setup.
 export async function GET() {
+  const info = {
+    databaseUrl: describeUrl(),
+    authSecretSet: !!process.env.AUTH_SECRET && process.env.AUTH_SECRET.length >= 16,
+    deployment: process.env.VERCEL_URL || 'local',
+    builtFrom: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || 'local',
+  };
   try {
     if (!process.env.DATABASE_URL) throw new Error('no url');
-    const [{ n }] = await sql`select count(*)::int as n from information_schema.tables where table_schema = 'public'`;
     const [{ ok }] = await sql`select to_regclass('public.households') is not null as ok`;
     if (!ok) throw Object.assign(new Error('tables missing'), { code: '42P01' });
-    if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 16) throw new Error('auth');
-    return json({ ok: true, message: 'Everything is connected.', tables: n });
+    if (!info.authSecretSet) throw new Error('auth');
+    return json({ ok: true, message: 'Everything is connected.', ...info });
   } catch (e) {
-    return json({ ok: false, problem: explain(e) }, 500);
+    return json({ ok: false, problem: explain(e), errorCode: e?.code || e?.name || '', errorText: String(e?.message || '').replace(/postgres(ql)?:\/\/[^\s]+/g, '[url hidden]').slice(0, 200), ...info }, 500);
   }
 }
