@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+'use client';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-export const navigate = (path) => { window.location.hash = path; window.scrollTo(0, 0); };
+let router = null;
 
+export const navigate = (path) => {
+  if (router) router.push(path);
+  else window.location.href = path;
+  window.scrollTo(0, 0);
+};
+
+// Current path, e.g. "/admin/accounts". Also registers the Next router for navigate().
 export const useRoute = () => {
-  const get = () => (window.location.hash.replace(/^#/, '') || '/');
-  const [path, setPath] = useState(get);
-  useEffect(() => {
-    const on = () => setPath(get());
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
-  }, []);
-  return path;
+  const r = useRouter();
+  useEffect(() => { router = r; }, [r]);
+  return usePathname() || '/';
 };

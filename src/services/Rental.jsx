@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ShoppingCart, Plus, Minus, Trash2, FileDown, RotateCcw, AlertTriangle, Package } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { CrudManager, Field, Modal, StatusBadge, Tabs, Empty, SectionTitle } from '../components/ui';
+import { usePhoneLookup, CrudManager, Field, Modal, StatusBadge, Tabs, Empty, SectionTitle } from '../components/ui';
 import { inr, pdfInr, fmtDateTime, fmtDuration, cheapestPenalty, UNIT_MS, UNIT_LABEL } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
 
@@ -49,7 +49,7 @@ export default function RentalPage() {
     toast('Booking confirmed! Collect items from the Mahall office.');
     setCart({}); setBook(null); setLookup(book.phone);
   };
-  const mine = lookup ? state.rentals.filter((r) => r.phone === lookup.trim()) : [];
+  const mine = usePhoneLookup('rentals', lookup);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -107,7 +107,7 @@ export default function RentalPage() {
                   <div className="text-xs text-slate-500">Due {fmtDateTime(r.due)} · {inr(r.baseAmount + (r.penalty || 0))}</div>
                 </div>
               ))}
-              {lookup && !mine.length && <div className="text-xs text-slate-400">No bookings for this number.</div>}
+              {lookup.trim().length >= 10 && !mine.length && <div className="text-xs text-slate-400">No bookings for this number.</div>}
             </div>
           </div>
         </div>

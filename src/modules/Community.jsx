@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, Building2, Briefcase, GraduationCap, Phone, CalendarClock } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { Field, Modal, Empty, SectionTitle, StatusBadge } from '../components/ui';
+import { usePhoneLookup, Field, Modal, Empty, SectionTitle, StatusBadge } from '../components/ui';
 import { inr, fmtDate, today } from '../utils/format';
 
 export function CoursesPage() {
@@ -17,7 +17,7 @@ export function CoursesPage() {
     add('courseApplications', { ...apply, status: 'pending', date: new Date().toISOString(), userId: user?.id || '' });
     toast('Application sent to the institution'); setLookup(apply.phone); setApply(null);
   };
-  const mine = lookup ? state.courseApplications.filter((a) => a.phone === lookup.trim()) : [];
+  const mine = usePhoneLookup('courses', lookup);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
@@ -61,7 +61,7 @@ export function CoursesPage() {
           <input className="input" placeholder="Phone number" value={lookup} onChange={(e) => setLookup(e.target.value)} />
           <div className="mt-3 space-y-2">
             {mine.map((a) => <div key={a.id} className="text-sm border rounded p-2 flex justify-between gap-2"><span>{state.courses.find((c) => c.id === a.courseId)?.title}</span><StatusBadge status={a.status} /></div>)}
-            {lookup && !mine.length && <div className="text-xs text-slate-400">No applications found.</div>}
+            {lookup.trim().length >= 10 && !mine.length && <div className="text-xs text-slate-400">No applications found.</div>}
           </div>
         </div>
       </section>

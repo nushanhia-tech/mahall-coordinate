@@ -72,24 +72,24 @@ function Overview() {
 }
 
 function SettingsTab() {
-  const { resetDemo, toast, state, ask } = useApp();
+  const { resetDemo, importBackup, toast, state, ask } = useApp();
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     saveFile(`mahall-backup-${new Date().toISOString().slice(0, 10)}.json`, blob);
   };
   const importData = (file) => {
     const r = new FileReader();
-    r.onload = () => { try { const d = JSON.parse(r.result); localStorage.setItem('mahall-state-v1', JSON.stringify(d)); location.reload(); } catch { toast('Invalid backup file', 'error'); } };
+    r.onload = async () => { try { await importBackup(JSON.parse(r.result)); toast('Backup restored'); } catch (e) { toast(e.message || 'Invalid backup file', 'error'); } };
     r.readAsText(file);
   };
   return (
     <div className="card max-w-xl space-y-4">
       <h3 className="h2">Data & Settings</h3>
-      <p className="text-sm text-slate-500">All data is stored in this browser. Take a backup regularly.</p>
+      <p className="text-sm text-slate-500">All data is stored in the Supabase database. Backups exclude passwords; restored accounts keep their current password.</p>
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" onClick={exportData}>Download backup (JSON)</button>
         <label className="btn-outline cursor-pointer">Restore backup<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files[0] && importData(e.target.files[0])} /></label>
-        <button className="btn-danger" onClick={async () => { if (await ask({ title: 'Reset demo data?', message: 'All current data will be replaced with the demo data. This cannot be undone.', danger: true, okLabel: 'Reset' })) { resetDemo(); toast('Demo data restored'); } }}>Reset demo data</button>
+        <button className="btn-danger" onClick={async () => { if (await ask({ title: 'Reset demo data?', message: 'All current data will be replaced with the demo data. This cannot be undone.', danger: true, okLabel: 'Reset' })) { await resetDemo(); toast('Demo data restored'); } }}>Reset demo data</button>
       </div>
     </div>
   );

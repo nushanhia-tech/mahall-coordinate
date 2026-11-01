@@ -1,31 +1,46 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { seed, seedChittyPayments } from './seed';
+import { createClient } from '@supabase/supabase-js';
 import { uid } from '../utils/format';
 
-const KEY = 'mahall-state-v1';
-const SESSION_KEY = 'mahall-session';
 const Ctx = createContext(null);
+const SETTINGS = ['masjid', 'accountHeads', 'chitty'];
 
-const freshState = () => {
-  const s = seed();
-  s.chittyPayments = seedChittyPayments(s);
-  return s;
-};
+// Work out which records changed between two versions of the state.
+function diff(prev, next) {
+  const out = { collections: {}, settings: {} };
+  for (const key of Object.keys(next)) {
+    if (SETTINGS.includes(key)) {
+      if (JSON.stringify(prev[key]) !== JSON.stringify(next[key])) out.settings[key] = next[key];
+      continue;
+    }
+    if (!Array.isArray(next[key])) continue;
+    const before = new Map((prev[key] || []).map((r) => [r.id, JSON.stringify(r)]));
+    const upserts = next[key].filter((r) => before.get(r.id) !== JSON.stringify(r));
+    const ids = new Set(next[key].map((r) => r.id));
+    const deletes = [...before.keys()].filter((id) => !ids.has(id));
+    if (upserts.length || deletes.length) out.collections[key] = { upserts, deletes };
+  }
+  return Object.keys(out.collections).length || Object.keys(out.settings).length ? out : null;
+}
 
-const load = () => {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return { ...freshState(), ...JSON.parse(raw) };
-  } catch { /* fall through to seed */ }
-  return freshState();
+const api = async (url, opts = {}) => {
+  const res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json' }, cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
 };
 
 export function AppProvider({ children }) {
-  const [state, setState] = useState(load);
-  const [userId, setUserId] = useState(() => sessionStorage.getItem(SESSION_KEY) || '');
+  const [state, setState] = useState(null);
+  const [user, setUser] = useState(null);
+  const [chittyMemberId, setChittyMemberId] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [toasts, setToasts] = useState([]);
   const [dialog, setDialog] = useState(null);
-  const skipSave = useRef(false);
+  const stateRef = useRef(null);
+  const queue = useRef(Promise.resolve());
+  const pending = useRef(0);
+  const refetchTimer = useRef(null);
 
   const toast = useCallback((msg, type = 'success') => {
     const id = uid('t');
@@ -33,51 +48,81 @@ export function AppProvider({ children }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
   }, []);
 
-  // Persist and broadcast to other tabs.
-  useEffect(() => {
-    if (skipSave.current) { skipSave.current = false; return; }
+  const refresh = useCallback(async () => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      toast('Storage is full – try smaller images', 'error');
+      const d = await api('/api/state');
+      if (pending.current > 0) return; // a save is in flight; the next ping will refresh again
+      stateRef.current = d.state;
+      setState(d.state); setUser(d.user); setChittyMemberId(d.chittyMemberId);
+      setLoadError('');
+    } catch (e) {
+      setLoadError(e.message);
     }
-  }, [state, toast]);
-
-  // Pick up changes from other tabs (live auction bids, chat, etc.).
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === KEY && e.newValue) {
-        skipSave.current = true;
-        setState(JSON.parse(e.newValue));
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  const scheduleRefresh = useCallback(() => {
+    clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(refresh, 250);
+  }, [refresh]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // Live updates: Supabase Realtime pings when anything changes; plain polling as a fallback.
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    let channel = null, client = null;
+    if (url && key) {
+      client = createClient(url, key);
+      channel = client.channel('app-events').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_events' }, scheduleRefresh).subscribe();
+    }
+    const poll = setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, channel ? 30000 : 4000);
+    return () => { clearInterval(poll); if (channel) client.removeChannel(channel); };
+  }, [refresh, scheduleRefresh]);
+
+  // Change state locally right away, then save the difference to the server.
+  const update = useCallback((fn) => {
+    const prev = stateRef.current;
+    const next = structuredClone(prev);
+    fn(next);
+    stateRef.current = next;
+    setState(next);
+    const changes = diff(prev, next);
+    if (!changes) return;
+    pending.current += 1;
+    queue.current = queue.current
+      .then(() => api('/api/sync', { method: 'POST', body: JSON.stringify(changes) }))
+      .catch((e) => toast(`Not saved: ${e.message}`, 'error'))
+      .finally(() => { pending.current -= 1; if (pending.current === 0) scheduleRefresh(); });
+  }, [toast, scheduleRefresh]);
+
+  const add = useCallback((col, item) => { const id = item.id || uid(col.slice(0, 3)); update((s) => { s[col].push({ ...item, id }); }); return id; }, [update]);
+  const patch = useCallback((col, id, changes) => update((s) => { const i = s[col].findIndex((x) => x.id === id); if (i >= 0) s[col][i] = { ...s[col][i], ...(typeof changes === 'function' ? changes(s[col][i]) : changes) }; }), [update]);
+  const remove = useCallback((col, id) => update((s) => { s[col] = s[col].filter((x) => x.id !== id); }), [update]);
+
+  const login = async (username, password) => {
+    try { const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }); await refresh(); return d.user; }
+    catch { return null; }
+  };
+  const logout = async () => { await api('/api/auth/logout', { method: 'POST' }); setUser(null); await refresh(); };
+  const chittyLogin = async (code, password) => {
+    try { await api('/api/chitty/login', { method: 'POST', body: JSON.stringify({ code, password }) }); await refresh(); return true; }
+    catch { return false; }
+  };
+  const chittyLogout = async () => { await api('/api/chitty/logout', { method: 'POST' }); setChittyMemberId(''); await refresh(); };
+  const resetDemo = async () => { await api('/api/admin/reset', { method: 'POST' }); await refresh(); };
+  const importBackup = async (data) => { await api('/api/admin/import', { method: 'POST', body: JSON.stringify(data) }); await refresh(); };
 
   // In-page replacement for confirm()/prompt(). Resolves to true/false, or the typed text (null if cancelled).
   const ask = useCallback((opts) => new Promise((resolve) => setDialog({ ...opts, value: opts.defaultValue || '', resolve })), []);
   const closeDialog = (result) => { dialog?.resolve(result); setDialog(null); };
 
-  const update = useCallback((fn) => setState((s) => { const n = structuredClone(s); fn(n); return n; }), []);
-  const add = useCallback((col, item) => { const id = item.id || uid(col.slice(0, 3)); update((s) => { s[col].push({ ...item, id }); }); return id; }, [update]);
-  const patch = useCallback((col, id, changes) => update((s) => { const i = s[col].findIndex((x) => x.id === id); if (i >= 0) s[col][i] = { ...s[col][i], ...(typeof changes === 'function' ? changes(s[col][i]) : changes) }; }), [update]);
-  const remove = useCallback((col, id) => update((s) => { s[col] = s[col].filter((x) => x.id !== id); }), [update]);
-
-  const user = state.users.find((u) => u.id === userId) || null;
-  const login = (username, password) => {
-    const u = state.users.find((x) => x.username === username.trim() && x.password === password);
-    if (!u) return null;
-    sessionStorage.setItem(SESSION_KEY, u.id);
-    setUserId(u.id);
-    return u;
-  };
-  const logout = () => { sessionStorage.removeItem(SESSION_KEY); setUserId(''); };
-  const resetDemo = () => { const s = freshState(); setState(s); };
-
   return (
-    <Ctx.Provider value={{ state, update, add, patch, remove, user, login, logout, toast, resetDemo, ask }}>
-      {children}
+    <Ctx.Provider value={{ state, update, add, patch, remove, user, login, logout, toast, resetDemo, importBackup, ask, api, refresh, chittyMemberId, chittyLogin, chittyLogout }}>
+      {state ? children : (
+        <div className="min-h-screen grid place-items-center text-slate-500 text-sm">
+          {loadError ? <div className="text-center"><div className="text-red-600 font-semibold">Could not reach the server</div><div>{loadError}</div><button className="btn-primary mt-3" onClick={refresh}>Try again</button></div> : 'Loading…'}
+        </div>
+      )}
       {dialog && (
         <div className="fixed inset-0 z-[90] bg-black/40 grid place-items-center p-4" onMouseDown={() => closeDialog(dialog.input ? null : false)}>
           <form className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-4" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); closeDialog(dialog.input ? dialog.value.trim() : true); }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Plus, Pencil, Trash2, Upload, Search } from 'lucide-react';
 import { readImage } from '../utils/format';
 import { useApp } from '../store/AppContext';
@@ -169,3 +169,16 @@ export function SectionTitle({ icon: Icon, title, subtitle, action }) {
     </div>
   );
 }
+
+// Look up a visitor's own records by phone number (server only returns matches).
+export const usePhoneLookup = (kind, phone) => {
+  const { api } = useApp();
+  const [rows, setRows] = useState([]);
+  useEffect(() => {
+    const p = phone.trim();
+    if (p.length < 10) { setRows([]); return; }
+    const t = setTimeout(() => api(`/api/lookup?kind=${kind}&phone=${encodeURIComponent(p)}`).then((d) => setRows(d.rows)).catch(() => setRows([])), 300);
+    return () => clearTimeout(t);
+  }, [kind, phone, api]);
+  return rows;
+};

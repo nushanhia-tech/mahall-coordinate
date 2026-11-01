@@ -16,9 +16,9 @@ export default function Login() {
   const [form, setForm] = useState({ username: '', password: '' });
   const [err, setErr] = useState('');
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    const u = login(form.username, form.password);
+    const u = await login(form.username, form.password);
     if (!u) return setErr('Wrong username or password.');
     toast(`Welcome, ${u.name}`);
     const back = sessionStorage.getItem('mahall-after-login');

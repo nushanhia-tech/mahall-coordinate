@@ -48,7 +48,7 @@ export default function Navbar({ path }) {
           {user ? (
             <>
               <button onClick={() => go(portalPath(user))} className="ml-2 btn bg-gold-400 text-brand-900 hover:bg-gold-500"><LayoutDashboard size={16} /> My Portal</button>
-              <button onClick={() => { logout(); go('/'); }} className="p-2 rounded-lg hover:bg-white/10" title="Log out"><LogOut size={18} /></button>
+              <button onClick={async () => { await logout(); go('/'); }} className="p-2 rounded-lg hover:bg-white/10" title="Log out"><LogOut size={18} /></button>
             </>
           ) : (
             <button onClick={() => go('/login')} className="ml-2 btn bg-gold-400 text-brand-900 hover:bg-gold-500">Login</button>
@@ -64,7 +64,7 @@ export default function Navbar({ path }) {
           {user ? (
             <>
               <button onClick={() => go(portalPath(user))} className="block w-full text-left px-3 py-2 rounded bg-gold-400 text-brand-900 text-sm font-semibold">My Portal</button>
-              <button onClick={() => { logout(); go('/'); }} className="block w-full text-left px-3 py-2 text-sm">Log out</button>
+              <button onClick={async () => { await logout(); go('/'); }} className="block w-full text-left px-3 py-2 text-sm">Log out</button>
             </>
           ) : <button onClick={() => go('/login')} className="block w-full text-left px-3 py-2 rounded bg-gold-400 text-brand-900 text-sm font-semibold">Login</button>}
         </div>

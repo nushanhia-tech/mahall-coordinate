@@ -49,19 +49,22 @@ const TopBidder = ({ item, ended }) => {
 };
 
 export default function AuctionPage() {
-  const { state, update, toast, user } = useApp();
+  const { state, toast, user, api, refresh } = useApp();
   const now = useNow();
   const [sel, setSel] = useState(state.auctionItems[0]?.id);
   const [bid, setBid] = useState({ bidder: user?.name || '', phone: '', amount: '' });
   const item = state.auctionItems.find((a) => a.id === sel) || state.auctionItems[0];
 
-  const place = (e) => {
+  const place = async (e) => {
     e.preventDefault();
     const amt = Number(bid.amount);
     if (!isLive(item, Date.now())) return toast('This auction has ended', 'error');
     const need = minNext(item);
     if (amt < need) return toast(`Minimum bid is ${inr(need)}`, 'error');
-    update((s) => { s.auctionItems.find((a) => a.id === item.id).bids.push({ id: uid('bid'), bidder: bid.bidder.trim(), phone: bid.phone.trim(), amount: amt, time: new Date().toISOString() }); });
+    try {
+      await api('/api/auction/bid', { method: 'POST', body: JSON.stringify({ itemId: item.id, bidder: bid.bidder, phone: bid.phone, amount: amt }) });
+      await refresh();
+    } catch (err) { return toast(err.message, 'error'); }
     toast(`Bid of ${inr(amt)} placed!`);
     setBid({ ...bid, amount: '' });
   };

@@ -10,6 +10,7 @@ export default function UsersAdmin() {
     return '—';
   };
   const validate = (d, id) => {
+    if (!id && !d.password) { toast('Set a password for the new user', 'error'); return false; }
     if (state.users.some((u) => u.username === d.username && u.id !== id)) { toast('Username already taken', 'error'); return false; }
     if (d.role === 'institution' && !d.institutionId) { toast('Pick the institution for this account', 'error'); return false; }
     if (d.role !== 'institution') d.institutionId = '';
@@ -26,7 +27,7 @@ export default function UsersAdmin() {
       fields={[
         { name: 'name', label: 'Display name', required: true },
         { name: 'username', label: 'Username', required: true },
-        { name: 'password', label: 'Password', type: 'password', required: true },
+        { name: 'password', label: 'Password (leave blank to keep)', type: 'password' },
         { name: 'role', label: 'Role', type: 'select', required: true, options: [{ value: 'admin', label: 'Admin' }, { value: 'individual', label: 'Individual' }, { value: 'khateeb', label: 'Khateeb' }, { value: 'institution', label: 'Institution' }], render: (u) => <span className="badge bg-brand-100 text-brand-800 capitalize">{u.role}</span> },
         { name: 'householdId', label: 'Linked home (individuals)', type: 'select', table: false, options: state.households.map((h) => ({ value: h.id, label: `${h.homeNo} · ${h.headName}` })) },
         { name: 'institutionId', label: 'Linked institution', type: 'select', table: false, options: state.institutions.map((i) => ({ value: i.id, label: i.name })) },

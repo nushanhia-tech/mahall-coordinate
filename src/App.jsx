@@ -2,10 +2,10 @@ import { Lock } from 'lucide-react';
 import { useApp } from './store/AppContext';
 import { useRoute, navigate } from './router';
 import Navbar from './components/Navbar';
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
+import Dashboard from './screens/Dashboard';
+import Login from './screens/Login';
 import AdminPortal from './admin/AdminPortal';
-import { IndividualPortal, KhateebPortal, InstitutionPortal } from './pages/Portals';
+import { IndividualPortal, KhateebPortal, InstitutionPortal } from './screens/Portals';
 import RentalPage from './services/Rental';
 import ChittyPage from './services/Chitty';
 import AuctionPage from './services/Auction';
@@ -22,7 +22,7 @@ function RequireLogin({ roles, children }) {
       <Lock className="mx-auto text-brand-600 mb-3" size={32} />
       <h2 className="font-bold text-lg">{user ? 'You do not have access to this page' : 'Please log in to continue'}</h2>
       <p className="text-sm text-slate-500 mt-1">{user ? `Your account role is "${user.role}".` : 'This page is available to registered Mahall members.'}</p>
-      {!user && <button className="btn-primary mt-4" onClick={() => { sessionStorage.setItem('mahall-after-login', window.location.hash.slice(1)); navigate('/login'); }}>Go to login</button>}
+      {!user && <button className="btn-primary mt-4" onClick={() => { sessionStorage.setItem('mahall-after-login', window.location.pathname); navigate('/login'); }}>Go to login</button>}
     </div>
   );
 }

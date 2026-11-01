@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { CrudManager, Field } from '../components/ui';
-import { MapEmbed } from '../pages/Dashboard';
+import { MapEmbed } from '../screens/Dashboard';
 
 export default function LocationAdmin() {
   const { state, update, add, patch, remove, toast } = useApp();

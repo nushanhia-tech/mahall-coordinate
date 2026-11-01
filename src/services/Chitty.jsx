@@ -6,7 +6,6 @@ import { CrudManager, Field, Modal, StatusBadge, Tabs, Empty, ImageInput, Sectio
 import { inr, pdfInr, fmtDateTime, monthLabel } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
 
-const CK = 'mahall-chitty-member';
 export const currentChittyMonth = (c) => {
   const [y, m] = c.startMonth.split('-').map(Number);
   const now = new Date();
@@ -19,20 +18,17 @@ const payFor = (state, memberId, month) => {
 const poolTotal = (state) => state.chittyPayments.filter((p) => p.status === 'confirmed').reduce((a, p) => a + Number(p.amount), 0);
 
 export default function ChittyPage() {
-  const { state, add, toast } = useApp();
-  const [memberId, setMemberId] = useState(() => sessionStorage.getItem(CK) || '');
+  const { state, add, toast, chittyMemberId: memberId, chittyLogin, chittyLogout } = useApp();
   const [cred, setCred] = useState({ code: '', password: '' });
   const [pay, setPay] = useState(null);
   const c = state.chitty;
   const member = state.chittyMembers.find((m) => m.id === memberId);
 
-  const login = (e) => {
+  const login = async (e) => {
     e.preventDefault();
-    const m = state.chittyMembers.find((x) => x.code.toLowerCase() === cred.code.trim().toLowerCase() && x.password === cred.password);
-    if (!m) return toast('Wrong Chitty number or password', 'error');
-    sessionStorage.setItem(CK, m.id); setMemberId(m.id);
+    if (!(await chittyLogin(cred.code, cred.password))) toast('Wrong Chitty number or password', 'error');
   };
-  const logout = () => { sessionStorage.removeItem(CK); setMemberId(''); };
+  const logout = chittyLogout;
 
   if (!member) {
     return (
@@ -181,7 +177,7 @@ export function ChittyAdmin() {
       {tab === 'members' && (
         <CrudManager title="Chitty Members" items={state.chittyMembers} searchKeys={['code', 'name', 'phone']}
           defaults={{ code: 'C-' + String(state.chittyMembers.length + 1).padStart(3, '0'), password: 'chitty123' }}
-          fields={[{ name: 'code', label: 'Chitty No.', required: true }, { name: 'name', label: 'Name', required: true }, { name: 'phone', label: 'Phone' }, { name: 'password', label: 'Password', type: 'password', required: true },
+          fields={[{ name: 'code', label: 'Chitty No.', required: true }, { name: 'name', label: 'Name', required: true }, { name: 'phone', label: 'Phone' }, { name: 'password', label: 'Password (blank = keep)', type: 'password' },
             { name: 'paid', label: 'Paid months', form: false, render: (m) => months.filter((x) => payFor(state, m.id, x)?.status === 'confirmed').length }]}
           onAdd={(d) => { if (state.chittyMembers.some((m) => m.code === d.code)) return toast('Chitty number already used', 'error'); add('chittyMembers', d); toast('Member added'); }}
           onUpdate={(id, d) => { patch('chittyMembers', id, d); toast('Member updated'); }}
