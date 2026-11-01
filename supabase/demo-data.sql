@@ -1,8 +1,10 @@
 -- Mahall Coordinating System – demo data.
--- Run this ONCE in Supabase → SQL Editor, AFTER mahall-database.sql.
+-- Run in Supabase → SQL Editor, AFTER mahall-database.sql.
+-- WARNING: this ERASES all existing data in these tables and loads the demo data. Use it only for setup.
 -- Demo logins: admin/admin123, member/member123, khateeb/khateeb123, madrasa/inst123, Chitty C-001/chitty123
 begin;
-do $$ begin if exists (select 1 from masjid_profile) then raise exception 'Demo data is already loaded – nothing to do.'; end if; end $$;
+-- Start clean: removes any existing rows so this file can be run any number of times.
+truncate masjid_profile, chitty_settings, account_heads, households, household_members, institutions, users, courses, course_applications, opportunities, services, events, achievements, committee_members, helpdesk_contacts, transactions, donation_channels, donations, rental_items, rentals, rental_lines, chitty_members, chitty_payments, auction_items, auction_bids, chats, chat_messages, nikkah_applications, home_applications, home_application_members cascade;
 INSERT INTO public.masjid_profile VALUES ('main', 'Juma Masjid Mahall Committee', 'Serving the community with transparency and care', 'Main Road, Kuttippuram, Malappuram, Kerala 679571', 10.843700, 76.037500, '+91 94470 00000', 'office@mahall.org', 'The Mahall committee coordinates religious, educational, welfare and social activities for every home in the parish.', '{}', '2026-11-01 03:44:33.827957+00', '2026-11-01 03:44:33.827957+00');
 INSERT INTO public.chitty_settings VALUES ('main', 'Mahall Monthly Chitty 2026', 4500.00, 12, '2026-06', 'mahall.chitty@sbi', '{}', '2026-11-01 03:44:33.827957+00', '2026-11-01 03:44:33.827957+00');
 INSERT INTO public.account_heads VALUES ('General Fund', 0, '2026-11-01 03:44:33.827957+00');
