@@ -71,6 +71,24 @@ export async function getContext() {
   return { user, chittyMember, role: user?.role || 'public' };
 }
 
+// Big uploaded images that are only needed when someone opens them.
+export const HEAVY_FIELDS = { transactions: ['receipt'], donations: ['screenshot'], chittyPayments: ['screenshot'] };
+export const STORED = '__stored__'; // placeholder sent instead of the image itself
+
+export function stripHeavy(state) {
+  for (const [col, fields] of Object.entries(HEAVY_FIELDS)) {
+    state[col] = (state[col] || []).map((r) => { const o = { ...r }; for (const f of fields) if (o[f]) o[f] = STORED; return o; });
+  }
+  return state;
+}
+
+// May this viewer open this stored image?
+export function canSeeFile(ctx, col, row) {
+  if (ctx.role === 'admin') return true;
+  if (col === 'chittyPayments') return !!ctx.chittyMember && row.memberId === ctx.chittyMember.id;
+  return false;
+}
+
 const strip = (row, keys) => { const o = { ...row }; keys.forEach((k) => delete o[k]); return o; };
 
 // Remove anything this viewer should not see.
@@ -176,6 +194,14 @@ export async function applyChanges(ctx, changes) {
       if (!incoming?.id || typeof incoming.id !== 'string') throw new HttpError(400, 'Every record needs an id');
       const before = db[col].find((r) => r.id === incoming.id) || null;
       let row = { ...incoming };
+      for (const f of HEAVY_FIELDS[col] || []) {
+        if (row[f] === STORED) {
+          row[f] = before?.[f]
+            // a ledger entry created from a donation keeps the donation's screenshot as its receipt
+            || (col === 'transactions' && row.ref ? db.donations.find((d) => d.id === row.ref)?.screenshot : '')
+            || '';
+        }
+      }
       if (SECRET_COLLECTIONS.includes(col)) {
         if (row.password) row.password = await hashIfNeeded(row.password);
         else if (before?.password) row.password = before.password;

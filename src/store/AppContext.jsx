@@ -50,6 +50,7 @@ export function AppProvider({ children }) {
   const queue = useRef(Promise.resolve());
   const pending = useRef(0);
   const refetchTimer = useRef(null);
+  const version = useRef('');
 
   const toast = useCallback((msg, type = 'success') => {
     const id = uid('t');
@@ -57,10 +58,13 @@ export function AppProvider({ children }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
   }, []);
 
-  const refresh = useCallback(async () => {
+  // quick = only download if something changed since our last copy (used by background refreshes).
+  const refresh = useCallback(async (quick = false) => {
     try {
-      const d = await api('/api/state');
+      const d = await api('/api/state' + (quick === true && version.current ? `?since=${version.current}` : ''));
+      if (d.unchanged) return;
       if (pending.current > 0) return; // a save is in flight; the next ping will refresh again
+      version.current = d.version;
       stateRef.current = d.state;
       setState(d.state); setUser(d.user); setChittyMemberId(d.chittyMemberId);
       setLoadError('');
@@ -71,10 +75,10 @@ export function AppProvider({ children }) {
 
   const scheduleRefresh = useCallback(() => {
     clearTimeout(refetchTimer.current);
-    refetchTimer.current = setTimeout(refresh, 250);
+    refetchTimer.current = setTimeout(() => refresh(true), 250);
   }, [refresh]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]); // first load: always full
 
   // Live updates: Supabase Realtime pings when anything changes; plain polling as a fallback.
   useEffect(() => {
@@ -90,7 +94,7 @@ export function AppProvider({ children }) {
     const poll = setInterval(() => {
       if (document.visibilityState !== 'visible' || Date.now() - last < (live ? 30000 : 4000)) return;
       last = Date.now();
-      refresh();
+      refresh(true);
     }, 1000);
     return () => { clearInterval(poll); if (channel) client.removeChannel(channel); };
   }, [refresh, scheduleRefresh]);
@@ -108,7 +112,7 @@ export function AppProvider({ children }) {
     queue.current = queue.current
       .then(() => api('/api/sync', { method: 'POST', body: JSON.stringify(changes) }))
       .catch((e) => toast(`Not saved: ${e.message}`, 'error'))
-      .finally(() => { pending.current -= 1; if (pending.current === 0) scheduleRefresh(); });
+      .finally(() => { pending.current -= 1; if (pending.current === 0) { clearTimeout(refetchTimer.current); refetchTimer.current = setTimeout(() => refresh(true), 250); } });
   }, [toast, scheduleRefresh]);
 
   const add = useCallback((col, item) => { const id = item.id || uid(col.slice(0, 3)); update((s) => { s[col].push({ ...item, id }); }); return id; }, [update]);

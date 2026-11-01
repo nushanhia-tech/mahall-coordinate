@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { saveFile } from './download';
 
 const GREEN = [4, 120, 87];
@@ -7,7 +5,9 @@ const GREEN = [4, 120, 87];
 // Builds a branded A4 PDF. `blocks` is a list of:
 //   { heading }  { text }  { kv: [[label, value], ...] }  { table: { head: [...], body: [[...]], foot?: [[...]] } }
 //   { image: dataUrl, w, h }
-export function buildPdf({ org, title, subtitle, blocks = [] }) {
+// The PDF library is large, so it is only downloaded when someone actually makes a PDF.
+export async function buildPdf({ org, title, subtitle, blocks = [] }) {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   const M = 40;
@@ -74,8 +74,8 @@ export function buildPdf({ org, title, subtitle, blocks = [] }) {
   return doc;
 }
 
-export const downloadPdf = (opts, filename) => {
-  const doc = buildPdf(opts);
+export const downloadPdf = async (opts, filename) => {
+  const doc = await buildPdf(opts);
   saveFile(filename || `${opts.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`, doc.output('blob'));
   return doc;
 };

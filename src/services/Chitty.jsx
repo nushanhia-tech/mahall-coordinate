@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Coins, LogOut, Check, X, FileDown, Banknote, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { CrudManager, Field, Modal, StatusBadge, Tabs, Empty, ImageInput, SectionTitle, StatCard } from '../components/ui';
+import { CrudManager, Field, Modal, StatusBadge, Tabs, Empty, ImageInput, SectionTitle, StatCard, StoredImg } from '../components/ui';
 import { inr, pdfInr, fmtDateTime, monthLabel } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
 
@@ -103,7 +103,7 @@ export function ChittyAdmin() {
   const c = state.chitty;
   const [tab, setTab] = useState('monthly');
   const [month, setMonth] = useState(() => currentChittyMonth(c));
-  const [shot, setShot] = useState('');
+  const [shot, setShot] = useState(null);
   const [settings, setSettings] = useState(c);
   const pending = state.chittyPayments.filter((p) => p.status === 'pending');
   const mem = (id) => state.chittyMembers.find((m) => m.id === id);
@@ -167,7 +167,7 @@ export function ChittyAdmin() {
             <tbody>{pending.map((p) => (
               <tr key={p.id}>
                 <td className="text-xs">{fmtDateTime(p.date)}</td><td>{mem(p.memberId)?.code} · {mem(p.memberId)?.name}</td><td>M{p.month} – {monthLabel(c.startMonth, p.month - 1)}</td><td>{inr(p.amount)}{p.utr && <div className="text-xs text-slate-500">UTR {p.utr}</div>}</td>
-                <td>{p.screenshot ? <button className="text-brand-700 text-xs flex items-center gap-1" onClick={() => setShot(p.screenshot)}><ImageIcon size={13} />View</button> : '—'}</td>
+                <td>{p.screenshot ? <button className="text-brand-700 text-xs flex items-center gap-1" onClick={() => setShot({ id: p.id, value: p.screenshot })}><ImageIcon size={13} />View</button> : '—'}</td>
                 <td className="text-right whitespace-nowrap"><button className="btn-primary btn-sm mr-1" onClick={() => confirmPay(p)}><Check size={12} />Confirm</button><button className="btn-danger btn-sm" onClick={() => rejectPay(p)}><X size={12} />Reject</button></td>
               </tr>
             ))}</tbody></table>
@@ -193,7 +193,7 @@ export function ChittyAdmin() {
           <div className="sm:col-span-2"><button className="btn-primary">Save</button></div>
         </form>
       )}
-      <Modal open={!!shot} onClose={() => setShot('')} title="Payment screenshot" wide><img src={shot} alt="" className="max-h-[70vh] mx-auto" /></Modal>
+      <Modal open={!!shot} onClose={() => setShot(null)} title="Payment screenshot" wide>{shot && <div className="text-center"><StoredImg col="chittyPayments" id={shot.id} field="screenshot" value={shot.value} className="max-h-[70vh] mx-auto" /></div>}</Modal>
     </div>
   );
 }

@@ -9,6 +9,7 @@ export function explain(e) {
   if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 16) return 'AUTH_SECRET is missing or shorter than 16 characters in Vercel settings.';
   const code = e?.code || '';
   const msg = String(e?.message || '');
+  if (code === 'STEP_TIMEOUT') return `${msg}. The database did not answer in time – check that the Supabase project is not paused and that DATABASE_URL is the Transaction pooler address.`;
   if (code === '42P01') return 'The database tables are missing. Run mahall-database.sql in Supabase → SQL Editor.';
   if (code === '28P01' || /password authentication failed/i.test(msg)) return 'The database password in DATABASE_URL is wrong.';
   if (/tenant or user not found/i.test(msg)) return 'Wrong user name in DATABASE_URL: for the pooler it must be postgres.<project-id> (copy it from Supabase → Connect → Transaction pooler).';

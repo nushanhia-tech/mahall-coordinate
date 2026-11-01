@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, FileDown, Paperclip } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { Tabs, Modal, Field, ImageInput, StatusBadge, Empty } from '../components/ui';
+import { Tabs, Modal, Field, ImageInput, StatusBadge, Empty, StoredImg } from '../components/ui';
 import { inr, pdfInr, today, fmtDate } from '../utils/format';
 import { withRunningBalance, sumBy, periodRange } from '../utils/finance';
 import { downloadPdf } from '../utils/pdf';
@@ -10,7 +10,7 @@ import { saveFile } from '../utils/download';
 function Ledger() {
   const { state, add, patch, remove, toast, ask } = useApp();
   const [form, setForm] = useState(null);
-  const [view, setView] = useState('');
+  const [view, setView] = useState(null);
   const [filter, setFilter] = useState({ type: '', head: '' });
   const rows = withRunningBalance(state.transactions).reverse()
     .filter((t) => (!filter.type || t.type === filter.type) && (!filter.head || t.head === filter.head));
@@ -47,7 +47,7 @@ function Ledger() {
                 <td>{t.description}</td>
                 <td className={`text-right font-semibold ${t.type === 'income' ? 'text-green-700' : 'text-red-600'}`}>{t.type === 'income' ? '+' : '−'}{inr(t.amount)}</td>
                 <td className="text-right font-mono">{inr(t.balance)}</td>
-                <td>{t.receipt ? <button className="text-brand-700" onClick={() => setView(t.receipt)} title="View bill"><Paperclip size={15} /></button> : '—'}</td>
+                <td>{t.receipt ? <button className="text-brand-700" onClick={() => setView({ id: t.id, value: t.receipt })} title="View bill"><Paperclip size={15} /></button> : '—'}</td>
                 <td className="whitespace-nowrap text-right">
                   <button className="p-1 text-slate-500 hover:text-brand-700" onClick={() => setForm({ ...t })}><Pencil size={14} /></button>
                   <button className="p-1 text-slate-500 hover:text-red-600" onClick={async () => { if (await ask({ title: 'Delete entry?', message: `${t.description} – ${inr(t.amount)}`, danger: true, okLabel: 'Delete' })) { remove('transactions', t.id); toast('Entry deleted'); } }}><Trash2 size={14} /></button>
@@ -71,8 +71,8 @@ function Ledger() {
           </form>
         )}
       </Modal>
-      <Modal open={!!view} onClose={() => setView('')} title="Bill / Receipt" wide>
-        {view.startsWith('data:image') ? <img src={view} alt="bill" className="max-h-[70vh] mx-auto" /> : <button className="btn-primary" onClick={() => fetch(view).then((r) => r.blob()).then((b) => saveFile('bill.pdf', b))}>Download file</button>}
+      <Modal open={!!view} onClose={() => setView(null)} title="Bill / Receipt" wide>
+        {view && <div className="text-center"><StoredImg col="transactions" id={view.id} field="receipt" value={view.value} className="max-h-[70vh] mx-auto" /></div>}
       </Modal>
     </div>
   );

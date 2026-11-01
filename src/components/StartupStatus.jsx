@@ -25,6 +25,9 @@ export default function StartupStatus({ error, onRetry }) {
   const db = health?.databaseUrl || {};
   const rows = health && [
     ['Problem', health.ok ? 'None – the database answered. Click "Try again".' : health.problem],
+    ['Step 1: find server', health.steps?.findServer],
+    ['Step 2: connect', health.steps?.openConnection],
+    ['Step 3: log in + query', health.steps?.loginAndQuery],
     ['Error code', health.errorCode],
     ['Error text', health.errorText],
     ['Database user', db.user],

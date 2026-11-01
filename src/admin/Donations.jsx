@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, X, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { Tabs, Modal, Field, ImageInput, StatusBadge, Empty } from '../components/ui';
+import { Tabs, Modal, Field, ImageInput, StatusBadge, Empty, StoredImg } from '../components/ui';
 import { ChannelQR } from '../components/Donate';
 import { inr, fmtDateTime, uid } from '../utils/format';
 
@@ -9,7 +9,7 @@ function Queue() {
   const { state, update, toast } = useApp();
   const [status, setStatus] = useState('pending');
   const [act, setAct] = useState(null);
-  const [shot, setShot] = useState('');
+  const [shot, setShot] = useState(null);
   const list = [...state.donations].filter((d) => !status || d.status === status).sort((a, b) => b.date.localeCompare(a.date));
   const ch = (id) => state.donationChannels.find((c) => c.id === id);
 
@@ -41,7 +41,7 @@ function Queue() {
                 <td><div className="font-medium">{d.name}</div><div className="text-xs text-slate-500">{d.phone}{d.note && ` · ${d.note}`}</div></td>
                 <td>{ch(d.channelId)?.name}</td>
                 <td className="text-right font-semibold">{inr(d.amount)}</td>
-                <td>{d.screenshot ? <button className="text-brand-700 flex items-center gap-1 text-xs" onClick={() => setShot(d.screenshot)}><ImageIcon size={14} />View</button> : <span className="text-xs text-slate-400">none</span>}</td>
+                <td>{d.screenshot ? <button className="text-brand-700 flex items-center gap-1 text-xs" onClick={() => setShot({ id: d.id, value: d.screenshot })}><ImageIcon size={14} />View</button> : <span className="text-xs text-slate-400">none</span>}</td>
                 <td><StatusBadge status={d.status} />{d.remark && <div className="text-xs text-slate-500 mt-0.5">{d.remark}</div>}{d.accountHead && <div className="text-xs text-slate-500">→ {d.accountHead}</div>}</td>
                 <td className="text-right whitespace-nowrap">
                   {d.status === 'pending' && <>
@@ -59,14 +59,14 @@ function Queue() {
         {act && (
           <form onSubmit={decide} className="space-y-3">
             <p className="text-sm">{act.name} · <b>{inr(act.amount)}</b> · {ch(act.channelId)?.name}</p>
-            {act.screenshot && <img src={act.screenshot} alt="proof" className="max-h-64 rounded border mx-auto" />}
+            {act.screenshot && <div className="text-center"><StoredImg col="donations" id={act.id} field="screenshot" value={act.screenshot} className="max-h-64 rounded border mx-auto" /></div>}
             {act.decision === 'approved' && <Field label="Post income to account"><select className="input" value={act.head} onChange={(e) => setAct({ ...act, head: e.target.value })}>{state.accountHeads.map((h) => <option key={h}>{h}</option>)}</select></Field>}
             <Field label={act.decision === 'rejected' ? 'Reason *' : 'Remark'}><input className="input" required={act.decision === 'rejected'} value={act.remark} onChange={(e) => setAct({ ...act, remark: e.target.value })} /></Field>
             <div className="flex justify-end gap-2"><button type="button" className="btn-outline" onClick={() => setAct(null)}>Cancel</button><button className={act.decision === 'approved' ? 'btn-primary' : 'btn-danger'}>Confirm</button></div>
           </form>
         )}
       </Modal>
-      <Modal open={!!shot} onClose={() => setShot('')} title="Payment screenshot" wide><img src={shot} alt="screenshot" className="max-h-[70vh] mx-auto" /></Modal>
+      <Modal open={!!shot} onClose={() => setShot(null)} title="Payment screenshot" wide>{shot && <div className="text-center"><StoredImg col="donations" id={shot.id} field="screenshot" value={shot.value} className="max-h-[70vh] mx-auto" /></div>}</Modal>
     </div>
   );
 }

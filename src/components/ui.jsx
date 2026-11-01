@@ -182,3 +182,27 @@ export const usePhoneLookup = (kind, phone) => {
   }, [kind, phone, api]);
   return rows;
 };
+
+// Shows an uploaded image that may be stored on the server (value === '__stored__');
+// it is fetched only when this is on screen.
+export function StoredImg({ col, id, field, value, className = '' }) {
+  const { api } = useApp();
+  const stored = value === '__stored__';
+  const [src, setSrc] = useState(stored ? '' : value);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!stored) { setSrc(value); return; }
+    let cancelled = false;
+    setSrc(''); setFailed(false);
+    api(`/api/file?col=${col}&id=${encodeURIComponent(id)}&field=${field}`)
+      .then((d) => { if (!cancelled) setSrc(d.data); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [col, id, field, value, stored, api]);
+  if (failed) return <div className="text-sm text-red-600 text-center py-6">Could not load the image.</div>;
+  if (!src) return <div className="text-sm text-slate-400 text-center py-6">Loading image…</div>;
+  if (!src.startsWith('data:image')) {
+    return <button className="btn-primary" onClick={() => fetch(src).then((r) => r.blob()).then((b) => import('../utils/download').then((m) => m.saveFile('bill.pdf', b)))}>Download file</button>;
+  }
+  return <img src={src} alt="" className={className} />;
+}
