@@ -29,7 +29,8 @@ export default function Navbar({ path }) {
   const link = (label, p) => (
     <button key={p} onClick={() => go(p)} className={`px-3.5 py-2 rounded-full text-sm font-semibold transition ${path === p ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-600 hover:text-ink-900 hover:bg-white'}`}>{label}</button>
   );
-  const on = (k) => featureOn(state.config, k);
+  // the rental cart lives inside the Individual (home) login only
+  const on = (k) => featureOn(state.config, k) && (k !== 'rental' || user?.role === 'individual');
   const groups = ALL_GROUPS.map((g) => ({ ...g, items: g.items.filter(([, , k]) => on(k)) })).filter((g) => g.items.length);
   const initials = (user?.name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 

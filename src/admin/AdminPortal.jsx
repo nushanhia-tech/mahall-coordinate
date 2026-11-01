@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { LayoutDashboard, Home, Wallet, HeartHandshake, CalendarDays, Users, MapPin, ShoppingCart, Coins, Gavel, MessageCircle, FileHeart, HomeIcon, GraduationCap, Settings, HandCoins, ToggleRight, FileText } from 'lucide-react';
 import FeaturesAdmin from './FeaturesAdmin';
+import { FileSpreadsheet, FileDown } from 'lucide-react';
+import { buildSheets, toXlsx, toCsv, csvZip } from '../utils/exportData';
 import { VariAdmin } from '../modules/Vari';
 import { InstitutionReportsAdmin } from '../modules/InstitutionReports';
 import { useApp, useStats } from '../store/AppContext';
@@ -79,6 +81,48 @@ function Overview() {
   );
 }
 
+// Excel / CSV exports of every table (sheet by sheet, or everything at once).
+function ExcelExports() {
+  const { state, toast, masjidInfo } = useApp();
+  const [busy, setBusy] = useState('');
+  const sheets = buildSheets(state);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const base = masjidInfo?.slug || 'mahall';
+  const run = async (key, fn) => {
+    setBusy(key);
+    try { await fn(); toast('Download ready'); } catch (e) { toast(`Could not create the file: ${e.message}`, 'error'); } finally { setBusy(''); }
+  };
+  const fileSafe = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const main = ['Households', 'Ledger', 'Donations', 'Rental bookings', 'Chitty payments', 'Monthly Vari', 'Nikkah applications', 'Home applications', 'Portal users'];
+  const ordered = [...sheets.filter((x) => main.includes(x.name)).sort((a, b) => main.indexOf(a.name) - main.indexOf(b.name)), ...sheets.filter((x) => !main.includes(x.name) && x.name !== 'About this backup')];
+  return (
+    <div className="card space-y-5">
+      <div className="flex flex-wrap items-start gap-4 justify-between">
+        <div className="max-w-xl">
+          <h3 className="h2 flex items-center gap-2"><FileSpreadsheet className="text-brand-600" size={22} />Download full backup in Excel</h3>
+          <p className="text-sm text-ink-500 mt-1">One Excel workbook with a separate sheet for every table: households, the financial ledger with receipt / voucher numbers, donations, rental bookings, chitty, monthly Vari, Nikkah & home applications, portal users and more. Passwords and uploaded images are never included.</p>
+        </div>
+        <div className="flex flex-col gap-2 shrink-0">
+          <button className="btn-primary" disabled={!!busy} onClick={() => run('xlsx', async () => saveFile(`${base}-full-backup-${stamp}.xlsx`, await toXlsx(sheets)))}><FileSpreadsheet size={16} />{busy === 'xlsx' ? 'Preparing…' : 'Full backup (.xlsx)'}</button>
+          <button className="btn-outline" disabled={!!busy} onClick={() => run('zip', async () => saveFile(`${base}-all-tables-csv-${stamp}.zip`, await csvZip(sheets)))}><FileDown size={16} />{busy === 'zip' ? 'Preparing…' : 'All tables as CSV (.zip)'}</button>
+        </div>
+      </div>
+      <div>
+        <div className="text-xs font-bold uppercase tracking-wider text-ink-400 mb-2">Download one table</div>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {ordered.map((sh) => (
+            <div key={sh.name} className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${main.includes(sh.name) ? 'border-brand-200 bg-brand-50/40' : 'border-sand-200'}`}>
+              <div className="flex-1 min-w-0"><div className="text-sm font-semibold truncate">{sh.name}</div><div className="text-[11px] text-ink-400">{sh.rows.length} row{sh.rows.length === 1 ? '' : 's'} · {sh.columns.length} columns</div></div>
+              <button className="btn-outline btn-sm" disabled={!!busy} onClick={() => run(sh.name, async () => saveFile(`${base}-${fileSafe(sh.name)}-${stamp}.xlsx`, await toXlsx([sh])))}>.xlsx</button>
+              <button className="btn-outline btn-sm" disabled={!!busy} onClick={() => run(sh.name + 'csv', async () => saveFile(`${base}-${fileSafe(sh.name)}-${stamp}.csv`, new Blob([toCsv(sh)], { type: 'text/csv;charset=utf-8' })))}>.csv</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsTab() {
   const { eraseAll, importBackup, toast, state, ask, masjidInfo } = useApp();
   const [busy, setBusy] = useState(false);
@@ -103,10 +147,11 @@ function SettingsTab() {
     try { await eraseAll(); toast('All data erased'); } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
   };
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-4xl">
+      <ExcelExports />
       <div className="card space-y-4">
-        <h3 className="h2">Backup</h3>
-        <p className="text-sm text-slate-500">Download a copy of all records of this masjid. Backups do not include passwords or uploaded receipts/screenshots.</p>
+        <h3 className="h2">System backup (for restoring)</h3>
+        <p className="text-sm text-ink-500">A technical copy (JSON) that this site can restore from. Use the Excel backup above for reading and sharing.</p>
         <div className="flex flex-wrap gap-2">
           <button className="btn-primary" onClick={exportData}>Download backup (JSON)</button>
           <label className="btn-outline cursor-pointer">Restore backup<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files[0] && importData(e.target.files[0])} /></label>
@@ -139,7 +184,7 @@ export const ADMIN_TABS = [
   ['vari', 'Monthly Vari', HandCoins, VariAdmin],
   ['reports', 'Institution reports', FileText, InstitutionReportsAdmin],
   ['features', 'Features & visibility', ToggleRight, FeaturesAdmin],
-  ['settings', 'Data & Settings', Settings, SettingsTab],
+  ['settings', 'Data Settings', Settings, SettingsTab],
 ];
 
 // Sidebar groups and a short, friendly line that explains each page.
@@ -166,7 +211,7 @@ const INTRO = {
   nikkah: 'Review Nikkah applications and print certificates.',
   homeapps: 'Approve new families – a household record is created for you.',
   community: 'Institutions, courses, opportunities and services.',
-  settings: 'Backups, restore, and starting fresh.',
+  settings: 'Download everything in Excel, keep a restorable backup, or start fresh.',
   vari: 'Each home\'s monthly contribution. Set rates, record cash, confirm UPI payments and print receipts.',
   reports: 'Financial reports sent by your institutions from their portal.',
   features: 'Switch every member-facing option on or off to match your Mahall\'s rules.',

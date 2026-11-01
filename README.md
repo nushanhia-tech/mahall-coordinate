@@ -28,6 +28,9 @@ New-home GPS disclaimer & live capture · Khateeb qualifications and Khateeb inb
 committee or both · Monthly Vari per home · Institution financial reports · Receipt (R-YYYY-NNNN) and voucher (V-YYYY-NNNN)
 numbers · Instant donation receipts · Rent advance · Admin → Features & visibility to switch every option on or off.
 
+- **Rental cart** is only for logged-in Individual (home) users, with **My Booking History** (period, return time, overdue charges, advance, status, PDF bill).
+- **Admin → Data Settings**: full backup as one Excel workbook (31 sheets), all tables as CSV (.zip), or any single table as .xlsx / .csv.
+
 ## Many masjids on one site
 - `/` – directory of all masjids
 - `/<masjid-address>` – that masjid's website, e.g. `/juma-masjid` (admin at `/juma-masjid/login`)
@@ -39,7 +42,7 @@ numbers · Instant donation receipts · Rent advance · Admin → Features & vis
 ```bash
 npm install
 cp .env.example .env.local      # fill in DATABASE_URL and AUTH_SECRET
-npm run db:migrate              # creates the tables (0001 + 0002 + 0003)
+npm run db:migrate              # creates the tables (0001 – 0004)
 npm run dev                     # http://localhost:3000
 ```
 Any Postgres works locally; the Supabase values are only needed for instant live updates (without them the app checks for changes every few seconds).

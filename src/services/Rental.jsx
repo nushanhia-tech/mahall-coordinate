@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ShoppingCart, Plus, Minus, Trash2, FileDown, RotateCcw, AlertTriangle, Package } from 'lucide-react';
 import { useApp, useFeature } from '../store/AppContext';
 import { featureOn } from '../utils/features';
-import { usePhoneLookup, CrudManager, Field, Modal, StatusBadge, Tabs, Empty, SectionTitle } from '../components/ui';
+import { CrudManager, Field, Modal, StatusBadge, Tabs, Empty, SectionTitle } from '../components/ui';
 import { inr, pdfInr, fmtDateTime, fmtDuration, cheapestPenalty, UNIT_MS, UNIT_LABEL } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
 
@@ -37,17 +37,61 @@ export function rentalBillPdf(state, r) {
 
 const UNIT_KEYS = { hour: 'rentHour', day: 'rentDay', week: 'rentWeek', month: 'rentMonth' };
 
+// Everything a member needs to know about their own bookings, with the official bill.
+function BookingHistory({ bookings }) {
+  const { state } = useApp();
+  const itemName = (id) => state.rentalItems.find((x) => x.id === id)?.name || 'Item';
+  const statusOf = (r) => (r.status === 'returned' ? 'returned' : isOverdue(r) ? 'overdue' : 'active');
+  if (!bookings.length) return <div className="card"><Empty>You have not booked anything yet. Your bookings will appear here.</Empty></div>;
+  return (
+    <div className="space-y-4">
+      {bookings.map((r) => {
+        const st = statusOf(r);
+        const rent = Number(r.baseAmount || 0) + Number(r.penalty || 0);
+        const adv = Number(r.advanceAmount || 0);
+        const balance = rent - (r.advancePaid ? adv : 0);
+        const lateNow = st === 'overdue' ? Date.now() - new Date(r.due) : 0;
+        return (
+          <div key={r.id} className={`card ${st === 'overdue' ? 'border-clay-300' : ''}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="font-display text-lg font-semibold">{r.items.map((i) => `${itemName(i.itemId)} × ${i.qty}`).join(', ')}</div>
+                <div className="text-xs text-ink-500 mt-0.5">Bill No. {r.id.toUpperCase()} · {r.duration} {UNIT_LABEL[r.unit]?.toLowerCase()}(s)</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={st === 'active' ? 'active' : st} />
+                <button className="btn-outline btn-sm" onClick={() => rentalBillPdf(state, r)}><FileDown size={12} />Official PDF bill</button>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 text-sm">
+              <div className="rounded-2xl bg-sand-50 p-3"><div className="text-[11px] font-bold uppercase tracking-wider text-ink-400">Booked period</div><div className="mt-1">{fmtDateTime(r.start)}</div><div className="text-ink-500">to {fmtDateTime(r.due)}</div></div>
+              <div className="rounded-2xl bg-sand-50 p-3"><div className="text-[11px] font-bold uppercase tracking-wider text-ink-400">Returned</div><div className="mt-1">{r.returnedAt ? fmtDateTime(r.returnedAt) : st === 'overdue' ? <span className="text-clay-600 font-semibold">Not yet – {fmtDuration(lateNow)} late</span> : 'Not yet'}</div>{r.remark && <div className="text-xs text-ink-500 mt-1">{r.remark}</div>}</div>
+              <div className="rounded-2xl bg-sand-50 p-3"><div className="text-[11px] font-bold uppercase tracking-wider text-ink-400">Charges</div><div className="mt-1">Rent {inr(r.baseAmount)}</div>{Number(r.penalty) > 0 ? <div className="text-clay-600 font-semibold">Overdue charge {inr(r.penalty)}</div> : <div className="text-ink-500">{st === 'overdue' ? 'Overdue charge added on return' : 'No overdue charge'}</div>}{r.penaltyDetail && <div className="text-[11px] text-ink-500 mt-1">{r.penaltyDetail}</div>}</div>
+              <div className="rounded-2xl bg-sand-50 p-3"><div className="text-[11px] font-bold uppercase tracking-wider text-ink-400">Rent advance</div>{adv > 0 ? <><div className="mt-1">{inr(adv)}</div><div className={r.advancePaid ? 'text-brand-700 font-semibold' : 'text-gold-600'}>{r.advancePaid ? `Paid · ${r.advanceMethod || 'cash'}${r.advanceReceivedAt ? ` · ${fmtDateTime(r.advanceReceivedAt)}` : ''}` : 'To pay at pickup'}</div></> : <div className="mt-1 text-ink-500">No advance</div>}</div>
+            </div>
+            <div className="mt-3 flex flex-wrap justify-end gap-4 text-sm">
+              <span>Total rent <b>{inr(rent)}</b></span>
+              {r.advancePaid && adv > 0 && <span className={balance >= 0 ? '' : 'text-brand-700'}>{balance >= 0 ? <>Balance to pay <b>{inr(balance)}</b></> : <>Refund due <b>{inr(-balance)}</b></>}</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function RentalPage() {
   const { state, add, toast, user } = useApp();
   const enabled = useFeature('rental', { forAdmins: true });
   const advOn = useFeature('rentAdvance');
-  const lookupOn = useFeature('rentMyBookings');
+  const historyOn = useFeature('rentMyBookings');
+  const [tab, setTab] = useState('book');
+  const home = state.households.find((h) => h.id === user?.householdId);
   const shownUnits = UNITS.filter((u) => featureOn(state.config, UNIT_KEYS[u]));
   const [cart, setCart] = useState({});
   const [unit, setUnit] = useState(() => (shownUnits.includes('day') ? 'day' : shownUnits[0] || 'day'));
   const [duration, setDuration] = useState(1);
   const [book, setBook] = useState(null);
-  const [lookup, setLookup] = useState('');
   const items = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => ({ item: state.rentalItems.find((i) => i.id === id), qty })).filter((x) => x.item);
   const unitOk = (u) => items.every(({ item }) => Number(item.rates[u]) > 0);
   const total = items.reduce((a, { item, qty }) => a + qty * Number(item.rates[unit] || 0) * duration, 0);
@@ -59,18 +103,21 @@ export default function RentalPage() {
     e.preventDefault();
     if (!unitOk(unit)) return toast(`Some items cannot be rented per ${unit}`, 'error');
     const start = new Date(book.start);
-    const r = { name: book.name, phone: book.phone, items: items.map(({ item, qty }) => ({ itemId: item.id, qty })), unit, duration: Number(duration), start: start.toISOString(), due: new Date(start.getTime() + duration * UNIT_MS[unit]).toISOString(), status: 'active', baseAmount: total, advanceAmount: advance, advancePaid: false, returnedAt: '', remark: '', penalty: 0, penaltyDetail: '' };
+    const r = { userId: user.id, name: book.name, phone: book.phone, items: items.map(({ item, qty }) => ({ itemId: item.id, qty })), unit, duration: Number(duration), start: start.toISOString(), due: new Date(start.getTime() + duration * UNIT_MS[unit]).toISOString(), status: 'active', baseAmount: total, advanceAmount: advance, advancePaid: false, returnedAt: '', remark: '', penalty: 0, penaltyDetail: '' };
     add('rentals', r);
     toast(advance ? `Booking confirmed! Please pay the advance of ${inr(advance)} when you collect the items.` : 'Booking confirmed! Collect items from the Mahall office.');
-    setCart({}); setBook(null); setLookup(book.phone);
+    setCart({}); setBook(null); if (historyOn) setTab('history');
   };
-  const mine = usePhoneLookup('rentals', lookup);
+  // My bookings: the server sends this member's own bookings in full (others only as stock numbers).
+  const mine = state.rentals.filter((r) => r.name !== undefined && (r.userId === user.id || !r.userId)).sort((a, b) => String(b.start).localeCompare(String(a.start)));
 
   if (!enabled) return <div className="max-w-md mx-auto my-20 card text-center p-8"><div className="text-3xl">🛒</div><h2 className="font-display text-2xl mt-2">The rental service is closed</h2><p className="text-sm text-ink-500 mt-2">Please contact the Mahall office.</p></div>;
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <SectionTitle icon={ShoppingCart} title="Rental Cart" subtitle="Hire Mahall items by the hour, day, week or month." />
-      <div className="grid lg:grid-cols-3 gap-6">
+      {historyOn && <Tabs active={tab} onChange={setTab} tabs={[{ id: 'book', label: 'Book items' }, { id: 'history', label: `My booking history${mine.length ? ` (${mine.length})` : ''}`, count: mine.filter(isOverdue).length }]} />}
+      {tab === 'history' && historyOn && <BookingHistory bookings={mine} />}
+      {tab === 'book' && <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 grid sm:grid-cols-2 gap-4 content-start">
           {state.rentalItems.map((it) => {
             const a = avail(it);
@@ -110,29 +157,17 @@ export default function RentalPage() {
                 </div>
                 <div className="flex justify-between font-bold text-lg mt-4"><span>Rent</span><span>{inr(total)}</span></div>
                 {advance > 0 && <div className="flex justify-between text-sm mt-1 rounded-xl bg-gold-50 px-3 py-2"><span>Advance at pickup <span className="text-xs text-ink-500">(adjusted on return)</span></span><b>{inr(advance)}</b></div>}
-                <button className="btn-primary w-full mt-3" disabled={!unitOk(unit)} onClick={() => setBook({ name: user?.name || '', phone: '', start: localNow() })}>Book now</button>
+                <button className="btn-primary w-full mt-3" disabled={!unitOk(unit)} onClick={() => setBook({ name: home?.headName || user?.name || '', phone: home?.phone || '', start: localNow() })}>Book now</button>
               </>
             ) : <Empty>Your cart is empty.</Empty>}
           </div>
-          {lookupOn && <div className="card">
-            <h3 className="font-bold mb-2">My bookings</h3>
-            <input className="input" placeholder="Enter your phone number" value={lookup} onChange={(e) => setLookup(e.target.value)} />
-            <div className="mt-3 space-y-2">
-              {mine.map((r) => (
-                <div key={r.id} className="text-sm border rounded-lg p-2">
-                  <div className="flex justify-between"><span className="font-medium">{r.items.map((i) => `${state.rentalItems.find((x) => x.id === i.itemId)?.name} ×${i.qty}`).join(', ')}</span><StatusBadge status={isOverdue(r) ? 'overdue' : r.status} /></div>
-                  <div className="text-xs text-slate-500">Due {fmtDateTime(r.due)} · {inr(r.baseAmount + (r.penalty || 0))}</div>
-                </div>
-              ))}
-              {lookup.trim().length >= 10 && !mine.length && <div className="text-xs text-slate-400">No bookings for this number.</div>}
-            </div>
-          </div>}
         </div>
-      </div>
+      </div>}
       <Modal open={!!book} onClose={() => setBook(null)} title="Confirm booking">
         {book && (
           <form onSubmit={confirm} className="space-y-3">
-            <Field label="Your name *"><input className="input" required value={book.name} onChange={(e) => setBook({ ...book, name: e.target.value })} /></Field>
+            <div className="text-xs text-ink-500 bg-sand-50 rounded-2xl px-3 py-2">Booking as <b>{user.name}</b>{home ? ` · ${home.homeNo}` : ''}. It will appear in your <b>My booking history</b>.</div>
+            <Field label="Name for the booking *"><input className="input" required value={book.name} onChange={(e) => setBook({ ...book, name: e.target.value })} /></Field>
             <Field label="Phone *"><input className="input" required pattern="[0-9+ ]{10,14}" value={book.phone} onChange={(e) => setBook({ ...book, phone: e.target.value })} /></Field>
             <Field label="Pick-up time *"><input type="datetime-local" className="input" required value={book.start} onChange={(e) => setBook({ ...book, start: e.target.value })} /></Field>
             <p className="text-sm bg-slate-50 rounded p-3">{duration} {unit}(s) · Return by <b>{fmtDateTime(new Date(new Date(book.start).getTime() + duration * UNIT_MS[unit]))}</b> · Rent <b>{inr(total)}</b>{advance > 0 && <> · Advance at pickup <b>{inr(advance)}</b></>}<br /><span className="text-xs text-slate-500">Late returns are charged at the cheapest rate that covers the extra time.</span></p>
@@ -183,7 +218,7 @@ export function RentalAdmin() {
 
   const Row = ({ r }) => (
     <tr className={isOverdue(r) ? 'bg-red-50' : ''}>
-      <td><div className="font-medium">{r.name}</div><div className="text-xs text-slate-500">{r.phone}</div></td>
+      <td><div className="font-medium">{r.name}</div><div className="text-xs text-slate-500">{r.phone}</div>{r.userId && <div className="text-[11px] text-brand-700">via login: {state.users.find((u) => u.id === r.userId)?.username || 'member'}</div>}</td>
       <td className="text-xs">{r.items.map((i) => <div key={i.itemId}>{itemName(i.itemId)} × {i.qty}</div>)}</td>
       <td className="text-xs">{r.duration} {r.unit}(s)<br />{fmtDateTime(r.start)}</td>
       <td className="text-xs">{fmtDateTime(r.due)}{isOverdue(r) && <div className="text-red-600 font-semibold flex items-center gap-1"><AlertTriangle size={11} />{fmtDuration(Date.now() - new Date(r.due))} late</div>}{r.returnedAt && <div>Returned {fmtDateTime(r.returnedAt)}</div>}</td>

@@ -12,11 +12,11 @@ export const GET = handle(async (req) => {
   const kind = searchParams.get('kind');
   const phone = (searchParams.get('phone') || '').trim();
   if (phone.length < 10) return json({ rows: [] });
-  const col = { rentals: 'rentals', courses: 'courseApplications', donations: 'donations' }[kind];
+  const col = { courses: 'courseApplications', donations: 'donations' }[kind];
   if (!col) return json({ rows: [] });
   const masjid = await getMasjid(req);
   const config = await getConfig(masjid.id);
-  const gate = { rentals: 'rentMyBookings', courses: 'courseApply', donations: 'donationReceiptLookup' }[kind];
+  const gate = { courses: 'courseApply', donations: 'donationReceiptLookup' }[kind];
   if (!featureOn(config, gate)) return json({ rows: [] });
   let rows = (await findBy(sql, col, 'phone', phone, masjid.id)).reverse().slice(0, 50);
   if (kind === 'donations') {

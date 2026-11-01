@@ -185,7 +185,9 @@ export function sanitize(state, ctx) {
   s.nikkahApps = role === 'khateeb' ? s.nikkahApps : user ? s.nikkahApps.filter((a) => a.userId === user.id) : [];
   s.homeApps = role === 'khateeb' ? s.homeApps : user ? s.homeApps.filter((a) => a.userId === user.id) : [];
   s.donations = myHome ? s.donations.filter((d) => d.phone === myHome.phone) : [];
-  s.rentals = s.rentals.map((r) => ({ id: r.id, items: r.items, status: r.status, due: r.due, unit: r.unit }));
+  // Rental cart: your own bookings in full (My Booking History); others only what is needed to show stock.
+  const myRental = (r) => user?.role === 'individual' && (r.userId === user.id || (!r.userId && myHome && r.phone === myHome.phone));
+  s.rentals = s.rentals.map((r) => (myRental(r) ? r : { id: r.id, items: r.items, status: r.status, due: r.due, unit: r.unit }));
   s.courseApplications = s.courseApplications.map((a) => (myCourses.includes(a.courseId) ? a : { id: a.id, courseId: a.courseId, status: a.status }));
   s.chittyMembers = chittyMember ? s.chittyMembers.filter((m) => m.id === chittyMember.id) : [];
   s.chittyPayments = chittyMember ? s.chittyPayments.filter((p) => p.memberId === chittyMember.id) : [];
@@ -218,7 +220,9 @@ function allowed(ctx, col, before, after, db) {
     }
     case 'rentals': {
       const unitKey = { hour: 'rentHour', day: 'rentDay', week: 'rentWeek', month: 'rentMonth' }[after?.unit];
-      return insert && on(db, 'rental') && !!unitKey && on(db, unitKey) && after.status === 'active' && !after.penalty && !after.returnedAt && !after.advancePaid;
+      // only logged-in Individual (home) users may book, and only for themselves
+      return insert && role === 'individual' && after.userId === user.id && on(db, 'rental') && !!unitKey && on(db, unitKey)
+        && after.status === 'active' && !after.penalty && !after.returnedAt && !after.advancePaid;
     }
     case 'courseApplications':
       if (insert) return on(db, 'courseApply') && after.status === 'pending';

@@ -12,7 +12,7 @@ export const openQuickFind = () => window.dispatchEvent(new Event('open-quick-fi
 const PAGES = [
   ['Home', '/', Home, 'dashboard start welcome'],
   ['Donate', '/#donate', HeartHandshake, 'give zakat sadaqa upi qr bank relief nercha receipt', 'homeDonate'],
-  ['Rental cart', '/services/rental', ShoppingCart, 'hire chairs tent sound booking advance', 'rental'],
+  ['Rental cart & my bookings', '/services/rental', ShoppingCart, 'hire chairs tent sound booking advance history bill', 'rental'],
   ['Chitty money', '/services/chitty', Coins, 'kuri savings monthly instalment', 'chitty'],
   ['Live auction (Lelam)', '/services/auction', Gavel, 'bid lelam nercha', 'auction'],
   ['Nikkah application', '/apply/nikkah', FileHeart, 'marriage wedding certificate waliyy witness', 'nikkah'],
@@ -40,7 +40,7 @@ const ADMIN = [
   ['vari', 'Monthly Vari', Coins, 'subscription home monthly dues cash collection'],
   ['reports', 'Institution reports', BookOpen, 'financial statement audit madrasa'],
   ['features', 'Features & visibility', Settings, 'switch toggle hide show on off rules'],
-  ['settings', 'Data & settings', Settings, 'backup erase restore'],
+  ['settings', 'Data settings', Settings, 'backup erase restore excel xlsx csv export download'],
 ];
 
 const greeting = () => {
@@ -99,7 +99,10 @@ export default function QuickFind() {
     if (!words.length) return suggestions;
     const match = (text) => words.every((w) => text.toLowerCase().includes(w));
     const out = [];
-    for (const [label, to, icon, kw, key] of PAGES) if ((!key || featureOn(state.config, key)) && match(`${label} ${kw}`)) out.push({ label, to, icon, hint: 'Page' });
+    for (const [label, to, icon, kw, key] of PAGES) {
+      if (key === 'rental' && user?.role !== 'individual') continue; // members-only service
+      if ((!key || featureOn(state.config, key)) && match(`${label} ${kw}`)) out.push({ label, to, icon, hint: 'Page' });
+    }
     if (isAdmin) for (const [id, label, icon, kw] of ADMIN) if (match(`${label} ${kw} admin`)) out.push({ label, to: `/admin/${id}`, icon, hint: 'Admin' });
     if (isAdmin) for (const h of state.households) if (match(`${h.homeNo} ${h.headName} ${h.phone} ${h.ward} ${h.address}`)) out.push({ label: `${h.homeNo} · ${h.headName}`, sub: `${h.members} members · ${h.ward || ''} ${h.phone ? `· ${h.phone}` : ''}`, to: '/admin/households', icon: Home, hint: 'Household' });
     for (const e of state.events) if (match(`${e.title} ${e.venue} event`)) out.push({ label: e.title, sub: `${fmtDate(e.date)} · ${e.venue || ''}`, to: '/', icon: CalendarDays, hint: 'Event' });

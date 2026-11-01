@@ -16,7 +16,7 @@ import HomeApplyPage from './modules/HomeApply';
 import MediationPage from './modules/Mediation';
 import { CoursesPage, OpportunitiesPage } from './modules/Community';
 
-function RequireLogin({ roles, children }) {
+function RequireLogin({ roles, children, note }) {
   const { user } = useApp();
   const here = useRoute();
   if (user && (!roles || roles.includes(user.role))) return children;
@@ -24,7 +24,7 @@ function RequireLogin({ roles, children }) {
     <div className="max-w-md mx-auto my-20 card text-center p-8 animate-fade-up">
       <div className="mx-auto mb-4 w-14 h-14 rounded-3xl bg-brand-50 text-brand-600 grid place-items-center"><Lock size={24} /></div>
       <h2 className="font-display text-2xl font-semibold text-ink-900">{user ? 'This page is not for your account' : 'Please log in first'}</h2>
-      <p className="text-sm text-ink-500 mt-2">{user ? `You are logged in as ${user.role}. Ask your masjid admin if you need access.` : 'This part of the site is for registered members of the Mahall. It only takes a moment.'}</p>
+      <p className="text-sm text-ink-500 mt-2">{note || (user ? `You are logged in as ${user.role}. Ask your masjid admin if you need access.` : 'This part of the site is for registered members of the Mahall. It only takes a moment.')}</p>
       {!user && <button className="btn-primary mt-4" onClick={() => { sessionStorage.setItem('mahall-after-login', here); navigate('/login'); }}>Go to login</button>}
     </div>
   );
@@ -51,7 +51,7 @@ const routes = [
   ['/portal', () => <RequireLogin roles={['individual']}><IndividualPortal /></RequireLogin>],
   ['/khateeb', () => <RequireLogin roles={['khateeb']}><KhateebPortal /></RequireLogin>],
   ['/institution', () => <RequireLogin roles={['institution']}><InstitutionPortal /></RequireLogin>],
-  ['/services/rental', () => <RentalPage />],
+  ['/services/rental', () => <RequireLogin roles={['individual']} note="The rental cart is only for registered Mahall families. Please log in with your home (Individual) account."><RentalPage /></RequireLogin>],
   ['/services/chitty', () => <FeatureGate k="chitty" title="Chitty"><ChittyPage /></FeatureGate>],
   ['/services/auction', () => <FeatureGate k="auction" title="The auction"><AuctionPage /></FeatureGate>],
   ['/apply/nikkah', () => <RequireLogin><NikkahPage /></RequireLogin>],

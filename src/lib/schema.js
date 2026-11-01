@@ -28,7 +28,7 @@ export const COLLECTION_SPEC = {
   rentalItems: { table: 'rental_items', fields: ['name', 'description', 'image', 'stock:int', 'rates.hour:num', 'rates.day:num', 'rates.week:num', 'rates.month:num', 'advance:num'] },
   rentals: {
     table: 'rentals',
-    fields: ['name', 'phone', 'unit', 'duration:int', 'start:ts', 'due:ts', 'status', 'baseAmount:num', 'returnedAt:ts', 'remark', 'penalty:num', 'penaltyDetail', 'total:num', 'advanceAmount:num', 'advancePaid:bool', 'advanceMethod', 'advanceReceivedAt:ts'],
+    fields: ['userId:fk', 'name', 'phone', 'unit', 'duration:int', 'start:ts', 'due:ts', 'status', 'baseAmount:num', 'returnedAt:ts', 'remark', 'penalty:num', 'penaltyDetail', 'total:num', 'advanceAmount:num', 'advancePaid:bool', 'advanceMethod', 'advanceReceivedAt:ts'],
     children: { items: { table: 'rental_lines', fields: ['itemId:fk', 'qty:int'] } },
   },
   chittyMembers: { table: 'chitty_members', fields: ['code', 'name', 'phone', 'password'] },

@@ -41,3 +41,7 @@ Then log in at `/super` (superadmin / super123), change that password, and add m
 
 ## Updating to the upgrade pack
 Run `supabase/migrations/0003_upgrade_pack.sql` once in Supabase → SQL Editor (safe to re-run). Existing ledger entries get receipt / voucher numbers automatically.
+
+## Rental cart for members + Excel backup (0004)
+Run `supabase/migrations/0004_rental_owner.sql` once in Supabase → SQL Editor (safe to re-run).
+It links each rental booking to the member who made it; older bookings made with a member's home phone number are linked automatically.

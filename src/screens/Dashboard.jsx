@@ -40,7 +40,8 @@ export default function Dashboard() {
   const s = useStats();
   const series = monthlySeries(state.transactions, 6);
   const m = state.masjid;
-  const on = (k) => featureOn(state.config, k);
+  // the rental cart lives inside the Individual (home) login only
+  const on = (k) => featureOn(state.config, k) && (k !== 'rental' || user?.role === 'individual');
   const today = new Date().toISOString().slice(0, 10);
   const nextEvent = [...state.events].filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0];
 

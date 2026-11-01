@@ -20,13 +20,13 @@ export const FEATURE_GROUPS = [
     ['homeMap', 'Map & directions', ''],
   ]],
   ['Rental cart', [
-    ['rental', 'Rental cart', 'The whole rental service.'],
+    ['rental', 'Rental cart', 'The whole rental service (only for logged-in Individual / home users).'],
     ['rentAdvance', 'Rent advance', 'Ask for a refundable advance when booking; deducted on return.'],
     ['rentHour', 'Rent by the hour', ''],
     ['rentDay', 'Rent by the day', ''],
     ['rentWeek', 'Rent by the week', ''],
     ['rentMonth', 'Rent by the month', ''],
-    ['rentMyBookings', '"My bookings" lookup', 'Look up bookings by phone number.'],
+    ['rentMyBookings', 'My Booking History tab', 'Members see their past and current bookings and download bills.'],
   ]],
   ['Chitty & auction', [
     ['chitty', 'Chitty money', ''],
