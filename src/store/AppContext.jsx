@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { uid } from '../utils/format';
+import StartupStatus from '../components/StartupStatus';
 
 const Ctx = createContext(null);
 const SETTINGS = ['masjid', 'accountHeads', 'chitty'];
@@ -134,9 +135,7 @@ export function AppProvider({ children }) {
   return (
     <Ctx.Provider value={{ state, update, add, patch, remove, user, login, logout, toast, resetDemo, importBackup, ask, api, refresh, chittyMemberId, chittyLogin, chittyLogout }}>
       {state ? children : (
-        <div className="min-h-screen grid place-items-center text-slate-500 text-sm">
-          {loadError ? <div className="text-center"><div className="text-red-600 font-semibold">Could not reach the server</div><div>{loadError}</div><button className="btn-primary mt-3" onClick={refresh}>Try again</button></div> : 'Loading…'}
-        </div>
+        <StartupStatus error={loadError} onRetry={() => { setLoadError(''); refresh(); }} />
       )}
       {dialog && (
         <div className="fixed inset-0 z-[90] bg-black/40 grid place-items-center p-4" onMouseDown={() => closeDialog(dialog.input ? null : false)}>
