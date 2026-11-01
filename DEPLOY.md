@@ -8,7 +8,7 @@
 4. Collect these values:
    - **Project Settings → Database → Connection string → Transaction pooler** (port 6543) → `DATABASE_URL`
      (replace `[YOUR-PASSWORD]` with your database password)
-   - `NEXT_PUBLIC_SUPABASE_URL` = `https://qxtxuzlijzivddclmlpg.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://ummsgohtcghqejdvqqjd.supabase.co`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your anon key (Project Settings → API). It is public by design: row-level security blocks it from reading any data.
 
 ## 2. GitHub (versioning)
