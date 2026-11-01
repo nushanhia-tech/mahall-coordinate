@@ -2,7 +2,7 @@
 
 ## 1. Supabase (database)
 1. Create a project at https://supabase.com (choose the Mumbai region for India).
-2. **SQL Editor → New query**: paste the contents of `supabase/migrations/0001_init.sql` and run it.
+2. **SQL Editor → New query**: paste `supabase/migrations/0001_init.sql` and run it; then do the same with `supabase/migrations/0002_multi_masjid.sql`.
    (Or locally: put the connection string in `.env.local` and run `npm run db:migrate`.)
 3. Check **Table Editor**: you should see 31 tables (households, transactions, donations, rentals, …).
 4. Collect these values:
@@ -34,3 +34,7 @@ Every `git push` to `main` now redeploys automatically; pushes to other branches
 ## Notes
 - `vercel.json` pins the functions to Dublin (`dub1`), next to the Supabase project in eu-west-1 (Ireland). Change it if your Supabase project is elsewhere: keep the two close together.
 - Uploaded images (receipts, screenshots, photos) are compressed and stored inside the database rows. If uploads grow large, move them to Supabase Storage.
+
+## Updating an existing site to many-masjid support
+Run `supabase/migrations/0002_multi_masjid.sql` once in Supabase → SQL Editor. Existing data becomes the masjid at `/juma-masjid`.
+Then log in at `/super` (superadmin / super123), change that password, and add more masjids.

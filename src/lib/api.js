@@ -10,6 +10,7 @@ export function explain(e) {
   const code = e?.code || '';
   const msg = String(e?.message || '');
   if (code === 'STEP_TIMEOUT') return `${msg}. The database did not answer in time – check that the Supabase project is not paused and that DATABASE_URL is the Transaction pooler address.`;
+  if (code === 'NO_MASJIDS_TABLE' || (code === '42P01' && /masjids|platform_admins/.test(msg)) || (code === '42703' && /masjid_id/.test(msg))) return 'The multi-masjid update is not in the database yet. Run supabase/migrations/0002_multi_masjid.sql in Supabase → SQL Editor.';
   if (code === '42P01') return 'The database tables are missing. Run mahall-database.sql in Supabase → SQL Editor.';
   if (code === '28P01' || /password authentication failed/i.test(msg)) return 'The database password in DATABASE_URL is wrong.';
   if (/tenant or user not found/i.test(msg)) return 'Wrong user name in DATABASE_URL: for the pooler it must be postgres.<project-id> (copy it from Supabase → Connect → Transaction pooler).';

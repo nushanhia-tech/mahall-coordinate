@@ -16,13 +16,14 @@ import { CoursesPage, OpportunitiesPage } from './modules/Community';
 
 function RequireLogin({ roles, children }) {
   const { user } = useApp();
+  const here = useRoute();
   if (user && (!roles || roles.includes(user.role))) return children;
   return (
     <div className="max-w-md mx-auto my-16 card text-center">
       <Lock className="mx-auto text-brand-600 mb-3" size={32} />
       <h2 className="font-bold text-lg">{user ? 'You do not have access to this page' : 'Please log in to continue'}</h2>
       <p className="text-sm text-slate-500 mt-1">{user ? `Your account role is "${user.role}".` : 'This page is available to registered Mahall members.'}</p>
-      {!user && <button className="btn-primary mt-4" onClick={() => { sessionStorage.setItem('mahall-after-login', window.location.pathname); navigate('/login'); }}>Go to login</button>}
+      {!user && <button className="btn-primary mt-4" onClick={() => { sessionStorage.setItem('mahall-after-login', here); navigate('/login'); }}>Go to login</button>}
     </div>
   );
 }
@@ -56,7 +57,7 @@ export default function App() {
       <main className="flex-1">{match ? match[1](sub) : <div className="p-16 text-center text-slate-500">Page not found. <button className="text-brand-700 underline" onClick={() => navigate('/')}>Go home</button></div>}</main>
       <footer className="bg-brand-900 text-brand-100 text-xs py-6 print:hidden">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-between gap-2">
-          <span>© {new Date().getFullYear()} {state.masjid.name} · Mahall Coordinating System</span>
+          <span>© {new Date().getFullYear()} {state.masjid.name} · Mahall Coordinating System · <a href="/" className="underline hover:text-white">All masjids</a></span>
           <span>{state.masjid.address}</span>
         </div>
       </footer>

@@ -1,9 +1,9 @@
 import { handle, json } from '@/lib/api';
 import { sql } from '@/lib/db';
 import { findBy } from '@/lib/repo';
+import { getMasjid } from '@/lib/state';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
 // "My bookings" / "My applications" lookups by phone number.
 export const GET = handle(async (req) => {
@@ -13,6 +13,7 @@ export const GET = handle(async (req) => {
   if (phone.length < 10) return json({ rows: [] });
   const col = kind === 'rentals' ? 'rentals' : kind === 'courses' ? 'courseApplications' : null;
   if (!col) return json({ rows: [] });
-  const rows = await findBy(sql, col, 'phone', phone);
+  const masjid = await getMasjid(req);
+  const rows = await findBy(sql, col, 'phone', phone, masjid.id);
   return json({ rows: rows.reverse().slice(0, 50) });
 });

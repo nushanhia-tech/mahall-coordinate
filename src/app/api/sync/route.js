@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export const POST = handle(async (req) => {
-  const [changes, ctx] = await Promise.all([body(req), getContext()]);
+  const [changes, ctx] = await Promise.all([body(req), getContext(req)]);
   await applyChanges(ctx, changes);
   return json({ ok: true });
 });

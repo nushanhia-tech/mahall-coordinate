@@ -10,7 +10,8 @@ export const GET = handle(async (req) => {
   const p = new URL(req.url).searchParams;
   const col = p.get('col'), id = p.get('id'), field = p.get('field');
   if (!HEAVY_FIELDS[col]?.includes(field)) throw new HttpError(400, 'Unknown file');
-  const [row, ctx] = await Promise.all([readOne(sql, col, id), getContext()]);
+  const ctx = await getContext(req);
+  const row = await readOne(sql, col, id, ctx.masjid.id);
   if (!row) throw new HttpError(404, 'Not found');
   if (!canSeeFile(ctx, col, row)) throw new HttpError(403, 'Not allowed');
   return json({ data: row[field] || '' });

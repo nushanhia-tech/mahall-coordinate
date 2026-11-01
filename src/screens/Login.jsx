@@ -3,6 +3,7 @@ import { LogIn, ShieldCheck, User, BookOpen, Building2 } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { navigate } from '../router';
 import { portalPath } from '../components/Navbar';
+import { useMasjidSlug } from '../router';
 
 const demos = [
   { role: 'Admin', icon: ShieldCheck, username: 'admin', password: 'admin123' },
@@ -13,6 +14,7 @@ const demos = [
 
 export default function Login() {
   const { login, toast } = useApp();
+  const isDemo = useMasjidSlug() === 'juma-masjid';
   const [form, setForm] = useState({ username: '', password: '' });
   const [err, setErr] = useState('');
 
@@ -27,7 +29,7 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 grid md:grid-cols-2 gap-6">
+    <div className={`max-w-4xl mx-auto px-4 py-12 grid gap-6 ${isDemo ? 'md:grid-cols-2' : 'max-w-md'}`}>
       <form onSubmit={submit} className="card space-y-4">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><LogIn className="text-brand-600" /> Portal Login</h1>
         <p className="text-sm text-slate-500">Admins, members, the Khateeb and institutions each get their own portal.</p>
@@ -36,6 +38,7 @@ export default function Login() {
         {err && <div className="text-sm text-red-600">{err}</div>}
         <button className="btn-primary w-full">Log in</button>
       </form>
+      {isDemo && (
       <div className="card">
         <h2 className="font-bold text-slate-800 mb-1">Demo accounts</h2>
         <p className="text-xs text-slate-500 mb-4">Click one to fill the form.</p>
@@ -49,6 +52,7 @@ export default function Login() {
         </div>
         <p className="text-xs text-slate-400 mt-4">Chitty members log in separately on the Chitty page (demo: C-001 / chitty123).</p>
       </div>
+      )}
     </div>
   );
 }

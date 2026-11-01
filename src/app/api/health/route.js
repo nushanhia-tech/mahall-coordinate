@@ -2,7 +2,8 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import { json, explain } from '@/lib/api';
 import { sql } from '@/lib/db';
-import { loadRaw } from '@/lib/state';
+import { loadRaw, ensureSeeded } from '@/lib/state';
+import { getMasjidBySlug } from '@/lib/masjids';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -47,7 +48,7 @@ function describeUrl() {
 }
 
 // Open /api/health in the browser to check the setup.
-export async function GET() {
+export async function GET(req) {
   const info = {
     databaseUrl: describeUrl(),
     authSecretSet: !!process.env.AUTH_SECRET && process.env.AUTH_SECRET.length >= 16,
@@ -73,11 +74,20 @@ export async function GET() {
     info.oneQueryMs = Date.now() - t0;
     if (!ok) throw Object.assign(new Error('tables missing'), { code: '42P01' });
     if (!info.authSecretSet) throw new Error('auth');
-    const [{ n }] = await sql`select count(*)::int as n from households`;
-    info.demoDataLoaded = n > 0;
-    const t1 = Date.now();
-    await withTimeout(loadRaw(), 20000, 'Loading all data');
-    info.fullLoadMs = Date.now() - t1;
+    const [{ mm }] = await sql`select to_regclass('public.masjids') is not null as mm`;
+    if (!mm) throw Object.assign(new Error('multi-masjid tables missing'), { code: 'NO_MASJIDS_TABLE' });
+    await withTimeout(ensureSeeded(), 30000, 'Creating the first masjid');
+    const [{ n }] = await sql`select count(*)::int as n from masjids`;
+    info.masjids = n;
+    const slug = req.headers.get('x-masjid') || new URL(req.url).searchParams.get('masjid');
+    const masjid = slug ? await getMasjidBySlug(slug) : (await sql`select id, slug from masjids order by created_at limit 1`)[0];
+    if (masjid) {
+      info.checkedMasjid = masjid.slug;
+      const t1 = Date.now();
+      const data = await withTimeout(loadRaw(masjid.id), 20000, 'Loading all data');
+      info.fullLoadMs = Date.now() - t1;
+      info.demoDataLoaded = data.households.length > 0 || data.users.length > 0;
+    }
     return json({ ok: true, message: 'Everything is connected.', ...info });
   } catch (e) {
     if (info.steps && !info.steps.loginAndQuery && info.steps.openConnection?.startsWith('ok')) info.steps.loginAndQuery = `FAILED: ${e.code || ''} ${e.message}`.slice(0, 200);

@@ -27,3 +27,8 @@ export const clearUserSession = async () => (await cookies()).delete(USER_COOKIE
 export const getChittySession = () => read(CHITTY_COOKIE); // { memberId }
 export const setChittySession = (memberId) => write(CHITTY_COOKIE, { memberId });
 export const clearChittySession = async () => (await cookies()).delete(CHITTY_COOKIE);
+
+const SUPER_COOKIE = 'mahall_super';
+export const getSuperSession = () => read(SUPER_COOKIE); // { username }
+export const setSuperSession = (username) => write(SUPER_COOKIE, { username });
+export const clearSuperSession = async () => (await cookies()).delete(SUPER_COOKIE);

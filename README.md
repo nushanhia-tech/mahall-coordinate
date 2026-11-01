@@ -1,6 +1,6 @@
 # Mahall Coordinating System
 
-Smart Community & Masjid ERP.
+Smart Community & Masjid ERP — one website that serves many masjids, each with its own address, admins and data.
 
 **Stack:** Next.js 15 (App Router, React 19) · Supabase (Postgres + Realtime) · Tailwind · Recharts · jsPDF · deployed on Vercel.
 
@@ -22,11 +22,18 @@ Smart Community & Masjid ERP.
   - checks every change against the user's role (`src/lib/state.js → allowed()`)
 - Demo data is inserted automatically the first time the app starts on an empty database.
 
+## Many masjids on one site
+- `/` – directory of all masjids
+- `/<masjid-address>` – that masjid's website, e.g. `/juma-masjid` (admin at `/juma-masjid/login`)
+- `/super` – site owner: add, rename, pause or delete masjids. Default login **superadmin / super123** – change it on first use.
+- Every table has a `masjid_id`; the server only ever reads or writes the current masjid's rows, and a login only counts inside its own masjid.
+- Masjid admins can **Erase all data** (Admin → Data & Settings): removes all records but keeps the masjid details, payment details, account heads and their own login.
+
 ## Run locally
 ```bash
 npm install
 cp .env.example .env.local      # fill in DATABASE_URL and AUTH_SECRET
-npm run db:migrate              # creates the tables
+npm run db:migrate              # creates the tables (0001 + 0002)
 npm run dev                     # http://localhost:3000
 ```
 Any Postgres works locally; the Supabase values are only needed for instant live updates (without them the app checks for changes every few seconds).
@@ -35,6 +42,8 @@ Any Postgres works locally; the Supabase values are only needed for instant live
 See [DEPLOY.md](DEPLOY.md).
 
 ## Demo logins
+Demo masjid `/juma-masjid` (created automatically on an empty database):
+
 | Portal | Username | Password |
 |---|---|---|
 | Admin | admin | admin123 |

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { createClient } from '@supabase/supabase-js';
 import { uid } from '../utils/format';
 import StartupStatus from '../components/StartupStatus';
+import { getCurrentSlug } from '../router';
 
 const Ctx = createContext(null);
 const SETTINGS = ['masjid', 'accountHeads', 'chitty'];
@@ -24,33 +25,39 @@ function diff(prev, next) {
   return Object.keys(out.collections).length || Object.keys(out.settings).length ? out : null;
 }
 
-const api = async (url, opts = {}) => {
+// Every request says which masjid it is for (x-masjid header).
+export const api = async (url, opts = {}) => {
   // Give up after 30 seconds so the page shows an error instead of loading forever.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
   let res;
   try {
-    res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json' }, cache: 'no-store', signal: ctrl.signal });
+    res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', 'x-masjid': getCurrentSlug() }, cache: 'no-store', signal: ctrl.signal });
   } catch (e) {
     throw new Error(e.name === 'AbortError' ? 'The server took too long to answer. Open /api/health to see why.' : 'No connection to the server.');
   } finally { clearTimeout(timer); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status });
   return data;
 };
 
-export function AppProvider({ children }) {
-  const [state, setState] = useState(null);
-  const [user, setUser] = useState(null);
-  const [chittyMemberId, setChittyMemberId] = useState('');
+// initial: the page's data, already fetched by the server (so no loading screen is needed).
+export function AppProvider({ children, initial = null }) {
+  const [state, setState] = useState(initial?.state || null);
+  const [user, setUser] = useState(initial?.user || null);
+  const [chittyMemberId, setChittyMemberId] = useState(initial?.chittyMemberId || '');
+  const [masjidInfo, setMasjidInfo] = useState(initial?.masjid || null);
   const [loadError, setLoadError] = useState('');
+  const [notFound, setNotFound] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [dialog, setDialog] = useState(null);
-  const stateRef = useRef(null);
+  const stateRef = useRef(initial?.state || null);
   const queue = useRef(Promise.resolve());
   const pending = useRef(0);
   const refetchTimer = useRef(null);
-  const version = useRef('');
+  const version = useRef(initial?.version || '');
+  useEffect(() => { setMounted(true); }, []);
 
   const toast = useCallback((msg, type = 'success') => {
     const id = uid('t');
@@ -66,10 +73,12 @@ export function AppProvider({ children }) {
       if (pending.current > 0) return; // a save is in flight; the next ping will refresh again
       version.current = d.version;
       stateRef.current = d.state;
+      setMasjidInfo(d.masjid);
       setState(d.state); setUser(d.user); setChittyMemberId(d.chittyMemberId);
       setLoadError('');
     } catch (e) {
-      setLoadError(e.message);
+      if (e.status === 404) setNotFound(true);
+      else if (!stateRef.current) setLoadError(e.message); // keep showing the page if we already have data
     }
   }, []);
 
@@ -78,7 +87,8 @@ export function AppProvider({ children }) {
     refetchTimer.current = setTimeout(() => refresh(true), 250);
   }, [refresh]);
 
-  useEffect(() => { refresh(); }, [refresh]); // first load: always full
+  // First load: if the server already sent the data, only check quietly for anything newer.
+  useEffect(() => { refresh(!!initial); }, [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live updates: Supabase Realtime pings when anything changes; plain polling as a fallback.
   useEffect(() => {
@@ -129,7 +139,7 @@ export function AppProvider({ children }) {
     catch { return false; }
   };
   const chittyLogout = async () => { await api('/api/chitty/logout', { method: 'POST' }); setChittyMemberId(''); await refresh(); };
-  const resetDemo = async () => { await api('/api/admin/reset', { method: 'POST' }); await refresh(); };
+  const eraseAll = async () => { await api('/api/admin/erase', { method: 'POST', body: JSON.stringify({ confirm: 'ERASE' }) }); await refresh(); };
   const importBackup = async (data) => { await api('/api/admin/import', { method: 'POST', body: JSON.stringify(data) }); await refresh(); };
 
   // In-page replacement for confirm()/prompt(). Resolves to true/false, or the typed text (null if cancelled).
@@ -137,8 +147,8 @@ export function AppProvider({ children }) {
   const closeDialog = (result) => { dialog?.resolve(result); setDialog(null); };
 
   return (
-    <Ctx.Provider value={{ state, update, add, patch, remove, user, login, logout, toast, resetDemo, importBackup, ask, api, refresh, chittyMemberId, chittyLogin, chittyLogout }}>
-      {state ? children : (
+    <Ctx.Provider value={{ state, update, add, patch, remove, user, login, logout, toast, eraseAll, importBackup, masjidInfo, ask, api, refresh, chittyMemberId, chittyLogin, chittyLogout }}>
+      {notFound ? <MasjidNotFound /> : state && mounted ? children : state ? <PageShell name={masjidInfo?.name} /> : (
         <StartupStatus error={loadError} onRetry={() => { setLoadError(''); refresh(); }} />
       )}
       {dialog && (
@@ -176,3 +186,25 @@ export const useStats = () => {
   const expense = state.transactions.filter((t) => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0);
   return { homes, people, institutions, students, income, expense, balance: income - expense };
 };
+
+// Shown for the split second before the page's code has started (the data is already here).
+function PageShell({ name }) {
+  return (
+    <div className="min-h-screen">
+      <div className="bg-brand-800 h-16 flex items-center px-4 text-white font-bold">{name || ''}</div>
+      <div className="bg-gradient-to-br from-brand-800 via-brand-700 to-brand-600 h-56" />
+    </div>
+  );
+}
+
+function MasjidNotFound() {
+  return (
+    <div className="min-h-screen grid place-items-center p-4 text-center">
+      <div className="space-y-3">
+        <div className="text-2xl font-bold text-slate-800">Masjid not found</div>
+        <p className="text-slate-500 text-sm">This web address does not belong to any masjid on this site, or it has been paused.</p>
+        <a href="/" className="btn-primary">See all masjids</a>
+      </div>
+    </div>
+  );
+}

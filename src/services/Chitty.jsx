@@ -5,6 +5,7 @@ import { useApp } from '../store/AppContext';
 import { CrudManager, Field, Modal, StatusBadge, Tabs, Empty, ImageInput, SectionTitle, StatCard, StoredImg } from '../components/ui';
 import { inr, pdfInr, fmtDateTime, monthLabel } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
+import { useMasjidSlug } from '../router';
 
 export const currentChittyMonth = (c) => {
   const [y, m] = c.startMonth.split('-').map(Number);
@@ -19,6 +20,7 @@ const poolTotal = (state) => state.chittyPayments.filter((p) => p.status === 'co
 
 export default function ChittyPage() {
   const { state, add, toast, chittyMemberId: memberId, chittyLogin, chittyLogout } = useApp();
+  const isDemo = useMasjidSlug() === 'juma-masjid';
   const [cred, setCred] = useState({ code: '', password: '' });
   const [pay, setPay] = useState(null);
   const c = state.chitty;
@@ -39,7 +41,7 @@ export default function ChittyPage() {
           <Field label="Chitty number"><input className="input" placeholder="C-001" value={cred.code} onChange={(e) => setCred({ ...cred, code: e.target.value })} required /></Field>
           <Field label="Chitty password"><input type="password" className="input" value={cred.password} onChange={(e) => setCred({ ...cred, password: e.target.value })} required /></Field>
           <button className="btn-primary w-full">Log in</button>
-          <p className="text-xs text-slate-400">Demo: C-001 / chitty123</p>
+          {isDemo && <p className="text-xs text-slate-400">Demo: C-001 / chitty123</p>}
         </form>
       </div>
     );

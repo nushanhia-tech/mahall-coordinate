@@ -4,7 +4,9 @@ import { getUserSession, getChittySession } from './auth';
 import { seed, seedChittyPayments } from '../store/seed';
 import { UNIT_MS } from '../utils/format';
 import { COLLECTIONS, SETTINGS } from './schema';
-import { readAll, readOne, writeSetting, upsertRow, deleteRow, wipeAll, insertMany } from './repo';
+import { readAll, readOne, writeSetting, upsertRow, deleteRow, wipeMasjid, insertMany, ForeignRowError } from './repo';
+import { getMasjidBySlug, forgetMasjid } from './masjids';
+import { uid } from '../utils/format';
 
 export { COLLECTIONS, SETTINGS };
 const SECRET_COLLECTIONS = ['users', 'chittyMembers']; // have a hashed `password` field
@@ -16,59 +18,108 @@ const hashIfNeeded = async (p) => (isHash(p) ? p : bcrypt.hash(String(p), 10));
 
 // ---------- seeding ----------
 
-// Writes a whole state into empty tables: one bulk insert per table.
-async function writeAll(tx, state) {
+// Writes a whole state for masjid m into empty tables: one bulk insert per table.
+async function writeAll(tx, state, m) {
   // Hash passwords first (the same demo password is hashed once).
   const cache = new Map();
   const hash = async (p) => { if (isHash(p)) return p; if (!cache.has(p)) cache.set(p, await bcrypt.hash(String(p), 10)); return cache.get(p); };
   for (const col of SECRET_COLLECTIONS) {
     state[col] = await Promise.all((state[col] || []).map(async (r) => ({ ...r, password: await hash(r.password || 'changeme123') })));
   }
-  for (const key of SETTINGS) await writeSetting(tx, key, state[key]);
-  for (const col of COLLECTIONS) await insertMany(tx, col, state[col] || []);
+  for (const key of SETTINGS) await writeSetting(tx, key, state[key], m);
+  for (const col of COLLECTIONS) await insertMany(tx, col, state[col] || [], m);
 }
 
 export const demoState = () => { const s = seed(); s.chittyPayments = seedChittyPayments(s); return s; };
 
+// A brand-new, empty site gets one masjid with demo data so there is something to look at.
 let seeded = false;
 export async function ensureSeeded() {
   if (seeded) return;
-  const [{ n }] = await sql`select count(*)::int as n from masjid_profile`;
+  const [{ n }] = await sql`select count(*)::int as n from masjids`;
   if (n === 0) {
     await sql.begin(async (tx) => {
       await tx`select pg_advisory_xact_lock(4242)`;
-      const [{ n: again }] = await tx`select count(*)::int as n from masjid_profile`;
-      if (again === 0) await writeAll(tx, demoState());
+      const [{ n: again }] = await tx`select count(*)::int as n from masjids`;
+      if (again > 0) return;
+      const demo = demoState();
+      await tx`insert into masjids (id, slug, name) values ('m_default', 'juma-masjid', ${demo.masjid.name})`;
+      await writeAll(tx, demo, 'm_default');
     });
   }
   seeded = true;
 }
 
-export async function replaceAll(state) {
+// Replace all of one masjid's data (restore a backup).
+export async function replaceAll(state, m) {
+  try {
+    await sql.begin(async (tx) => {
+      await wipeMasjid(tx, m);
+      await writeAll(tx, state, m);
+      await tx`insert into app_events (masjid_id, collections) values (${m}, ${['*']})`;
+    });
+  } catch (e) {
+    if (e.code === '23505') throw new HttpError(400, 'This backup contains records that already exist in another masjid on this site, so it cannot be restored here.');
+    throw e;
+  }
+}
+
+// Remove all records of a masjid but keep the masjid itself, its settings and the admin who asked.
+export async function eraseMasjidData(m, keepUserId) {
   await sql.begin(async (tx) => {
-    await wipeAll(tx);
-    await writeAll(tx, state);
-    await tx`insert into app_events (collections) values (${['*']})`;
+    await wipeMasjid(tx, m, { keepSettings: true, keepUserId });
+    await tx`insert into app_events (masjid_id, collections) values (${m}, ${['*']})`;
   });
+}
+
+// Starting data for a newly created masjid: its name, default account heads, empty payment details and one admin.
+export function newMasjidState({ name, adminName, adminUsername, adminPassword }) {
+  const blankBank = { holder: '', bank: '', accNo: '', ifsc: '' };
+  const channel = (id, n, head) => ({ id: uid('ch'), name: n, accountHead: head, upi: '', qr: '', qrImage: '', bank: blankBank, key: id });
+  const s = { masjid: { name, tagline: '', address: '', lat: 10.8505, lng: 76.2711, phone: '', email: '', about: '' },
+    accountHeads: ['General Fund', 'Relief Fund', 'Nercha Fund', 'Madrasa Fund', 'Maintenance'],
+    chitty: { name: `${name} Chitty`, monthlyAmount: 1000, months: 12, startMonth: new Date().toISOString().slice(0, 7), upi: '' } };
+  for (const c of COLLECTIONS) s[c] = [];
+  s.donationChannels = [channel('masjid', 'Masjid Fund', 'General Fund'), channel('relief', 'Relief Fund', 'Relief Fund'), channel('nercha', 'Nercha', 'Nercha Fund')];
+  s.users = [{ id: uid('u'), username: adminUsername, password: adminPassword, role: 'admin', name: adminName || 'Masjid Admin', householdId: '', institutionId: '' }];
+  return s;
+}
+
+export async function createMasjidWithData({ slug, name, adminName, adminUsername, adminPassword }) {
+  const id = uid('m');
+  await sql.begin(async (tx) => {
+    await tx`insert into masjids (id, slug, name) values (${id}, ${slug}, ${name})`;
+    await writeAll(tx, newMasjidState({ name, adminName, adminUsername, adminPassword }), id);
+  });
+  return id;
 }
 
 // ---------- reading ----------
 
-export async function loadRaw() {
-  await ensureSeeded();
-  return readAll(sql);
+export async function loadRaw(m) {
+  return readAll(sql, m);
 }
 
-export async function getContext() {
+// Which masjid is this request for? The browser sends its address name (slug) in the x-masjid header.
+export async function masjidForSlug(slug) {
+  await ensureSeeded();
+  const masjid = await getMasjidBySlug(slug || '');
+  if (!masjid || !masjid.active) throw new HttpError(404, 'Masjid not found');
+  return masjid;
+}
+export const getMasjid = (req) => masjidForSlug(req.headers.get('x-masjid') || new URL(req.url).searchParams.get('masjid'));
+
+// Who is asking, inside this masjid. A login from another masjid counts as a visitor here.
+export const getContext = async (req) => contextForMasjid(await getMasjid(req));
+export const contextForSlug = async (slug) => contextForMasjid(await masjidForSlug(slug));
+
+async function contextForMasjid(masjid) {
   const [us, cs] = await Promise.all([getUserSession(), getChittySession()]);
-  let user = null, chittyMember = null;
-  if (us?.userId) {
-    user = await readOne(sql, 'users', us.userId);
-  }
-  if (cs?.memberId) {
-    chittyMember = await readOne(sql, 'chittyMembers', cs.memberId);
-  }
-  return { user, chittyMember, role: user?.role || 'public' };
+  const [user, chittyMember] = await Promise.all([
+    us?.userId ? readOne(sql, 'users', us.userId, masjid.id) : null,
+    cs?.memberId ? readOne(sql, 'chittyMembers', cs.memberId, masjid.id) : null,
+  ]);
+  return { masjid, user, chittyMember, role: user?.role || 'public' };
 }
 
 // Big uploaded images that are only needed when someone opens them.
@@ -170,14 +221,15 @@ function normalise(col, row, db) {
 
 // changes: { collections: { [name]: { upserts: [row], deletes: [id] } }, settings: { [key]: value } }
 export async function applyChanges(ctx, changes) {
-  const db = await loadRaw();
+  const m = ctx.masjid.id;
+  const db = await loadRaw(m);
   const touched = new Set();
   const ops = [];
 
   for (const [key, value] of Object.entries(changes.settings || {})) {
     if (!SETTINGS.includes(key)) throw new HttpError(400, `Unknown setting ${key}`);
     if (ctx.role !== 'admin') throw new HttpError(403, 'Only admins can change settings');
-    ops.push((tx) => writeSetting(tx, key, value));
+    ops.push((tx) => writeSetting(tx, key, value, m));
     touched.add(key);
   }
 
@@ -187,7 +239,7 @@ export async function applyChanges(ctx, changes) {
       const before = db[col].find((r) => r.id === id);
       if (!before) continue;
       if (!allowed(ctx, col, before, null, db)) throw new HttpError(403, `Not allowed to delete from ${col}`);
-      ops.push((tx) => deleteRow(tx, col, id));
+      ops.push((tx) => deleteRow(tx, col, id, m));
       touched.add(col);
     }
     for (const incoming of upserts) {
@@ -209,22 +261,48 @@ export async function applyChanges(ctx, changes) {
       }
       if (!allowed(ctx, col, before, row, db)) throw new HttpError(403, `Not allowed to change ${col}`);
       row = normalise(col, row, db);
-      ops.push((tx) => upsertRow(tx, col, row));
+      ops.push((tx) => upsertRow(tx, col, row, m));
       touched.add(col);
     }
   }
 
   if (!ops.length) return;
-  await sql.begin(async (tx) => {
-    for (const op of ops) await op(tx);
-    await tx`insert into app_events (collections) values (${[...touched]})`;
-  });
+  try {
+    await sql.begin(async (tx) => {
+      for (const op of ops) await op(tx);
+      // keep the directory's name in step with the masjid's own details
+      if (changes.settings?.masjid?.name) await tx`update masjids set name = ${String(changes.settings.masjid.name).trim()}, updated_at = now() where id = ${m}`;
+      await tx`insert into app_events (masjid_id, collections) values (${m}, ${[...touched]})`;
+    });
+    if (changes.settings?.masjid?.name) forgetMasjid(ctx.masjid.slug);
+  } catch (e) {
+    if (e instanceof ForeignRowError) throw new HttpError(403, 'Not allowed to change that record');
+    if (e.code === '23505') throw new HttpError(400, 'That name or number is already used in this masjid.');
+    throw e;
+  }
 }
 
-export async function pingChange(collections) {
-  await sql`insert into app_events (collections) values (${collections})`;
+export async function pingChange(m, collections) {
+  await sql`insert into app_events (masjid_id, collections) values (${m}, ${collections})`;
 }
 
 export async function verifyPassword(plain, hash) {
   return isHash(hash) ? bcrypt.compare(String(plain), hash) : false;
+}
+
+// Everything one masjid's page needs, filtered for the person asking.
+export async function clientStateFor(ctx) {
+  const m = ctx.masjid.id;
+  const [[{ v }], raw] = await Promise.all([
+    sql`select coalesce(max(id), 0)::text as v from app_events where masjid_id = ${m}`,
+    loadRaw(m),
+  ]);
+  const { user, chittyMember } = ctx;
+  return {
+    version: v,
+    masjid: { slug: ctx.masjid.slug, name: ctx.masjid.name },
+    state: stripHeavy(sanitize(raw, ctx)),
+    user: user ? { ...user, password: undefined } : null,
+    chittyMemberId: chittyMember?.id || '',
+  };
 }

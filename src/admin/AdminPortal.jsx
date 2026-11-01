@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { LayoutDashboard, Home, Wallet, HeartHandshake, CalendarDays, Users, MapPin, ShoppingCart, Coins, Gavel, MessageCircle, FileHeart, HomeIcon, GraduationCap, Settings } from 'lucide-react';
 import { useApp, useStats } from '../store/AppContext';
 import { navigate } from '../router';
@@ -72,24 +73,42 @@ function Overview() {
 }
 
 function SettingsTab() {
-  const { resetDemo, importBackup, toast, state, ask } = useApp();
+  const { eraseAll, importBackup, toast, state, ask, masjidInfo } = useApp();
+  const [busy, setBusy] = useState(false);
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    saveFile(`mahall-backup-${new Date().toISOString().slice(0, 10)}.json`, blob);
+    saveFile(`${masjidInfo?.slug || 'mahall'}-backup-${new Date().toISOString().slice(0, 10)}.json`, blob);
   };
   const importData = (file) => {
     const r = new FileReader();
     r.onload = async () => { try { await importBackup(JSON.parse(r.result)); toast('Backup restored'); } catch (e) { toast(e.message || 'Invalid backup file', 'error'); } };
     r.readAsText(file);
   };
+  const erase = async () => {
+    const typed = await ask({
+      title: 'Erase ALL data?',
+      message: 'This permanently deletes every household, transaction, donation, rental, chitty record, auction, chat, application, event, course and user (except you). Your masjid details, payment (UPI/bank) details and account heads are kept. Download a backup first if you may need it. Type ERASE to confirm.',
+      input: true, required: true, placeholder: 'ERASE', danger: true, okLabel: 'Erase everything',
+    });
+    if (typed === null) return;
+    if (typed !== 'ERASE') return toast('Nothing was deleted – you must type ERASE in capital letters.', 'error');
+    setBusy(true);
+    try { await eraseAll(); toast('All data erased'); } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
+  };
   return (
-    <div className="card max-w-xl space-y-4">
-      <h3 className="h2">Data & Settings</h3>
-      <p className="text-sm text-slate-500">All data is stored in the Supabase database. Backups exclude passwords; restored accounts keep their current password.</p>
-      <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={exportData}>Download backup (JSON)</button>
-        <label className="btn-outline cursor-pointer">Restore backup<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files[0] && importData(e.target.files[0])} /></label>
-        <button className="btn-danger" onClick={async () => { if (await ask({ title: 'Reset demo data?', message: 'All current data will be replaced with the demo data. This cannot be undone.', danger: true, okLabel: 'Reset' })) { await resetDemo(); toast('Demo data restored'); } }}>Reset demo data</button>
+    <div className="space-y-6 max-w-2xl">
+      <div className="card space-y-4">
+        <h3 className="h2">Backup</h3>
+        <p className="text-sm text-slate-500">Download a copy of all records of this masjid. Backups do not include passwords or uploaded receipts/screenshots.</p>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary" onClick={exportData}>Download backup (JSON)</button>
+          <label className="btn-outline cursor-pointer">Restore backup<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files[0] && importData(e.target.files[0])} /></label>
+        </div>
+      </div>
+      <div className="card space-y-3 border-red-200">
+        <h3 className="h2 text-red-700">Erase all data</h3>
+        <p className="text-sm text-slate-600">Start fresh: removes <b>all records</b> of this masjid (households, finance, donations, services, applications, chats, events, courses and all other users). Kept: the masjid details, payment details, account heads and your own admin login.</p>
+        <button className="btn-danger" disabled={busy} onClick={erase}>{busy ? 'Erasing…' : 'Erase all data'}</button>
       </div>
     </div>
   );
