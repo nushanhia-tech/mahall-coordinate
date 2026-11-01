@@ -152,10 +152,10 @@ export function AppProvider({ children, initial = null }) {
         <StartupStatus error={loadError} onRetry={() => { setLoadError(''); refresh(); }} />
       )}
       {dialog && (
-        <div className="fixed inset-0 z-[90] bg-black/40 grid place-items-center p-4" onMouseDown={() => closeDialog(dialog.input ? null : false)}>
-          <form className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-4" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); closeDialog(dialog.input ? dialog.value.trim() : true); }}>
-            <div className="font-bold text-slate-800">{dialog.title || 'Please confirm'}</div>
-            {dialog.message && <p className="text-sm text-slate-600">{dialog.message}</p>}
+        <div className="fixed inset-0 z-[90] bg-ink-900/30 backdrop-blur-sm grid place-items-center p-4" onMouseDown={() => closeDialog(dialog.input ? null : false)}>
+          <form className="bg-white rounded-4xl shadow-lift w-full max-w-sm p-6 space-y-4 animate-fade-up" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); closeDialog(dialog.input ? dialog.value.trim() : true); }}>
+            <div className="font-display text-xl font-semibold text-ink-900">{dialog.title || 'Please confirm'}</div>
+            {dialog.message && <p className="text-sm text-ink-600 leading-relaxed">{dialog.message}</p>}
             {dialog.input && <input autoFocus className="input" placeholder={dialog.placeholder || ''} required={dialog.required} value={dialog.value} onChange={(e) => setDialog({ ...dialog, value: e.target.value })} />}
             <div className="flex justify-end gap-2">
               <button type="button" className="btn-outline" onClick={() => closeDialog(dialog.input ? null : false)}>Cancel</button>
@@ -164,9 +164,11 @@ export function AppProvider({ children, initial = null }) {
           </form>
         </div>
       )}
-      <div className="fixed bottom-4 right-4 z-[100] space-y-2 print:hidden">
+      <div className="fixed bottom-5 inset-x-0 sm:inset-x-auto sm:right-5 z-[100] flex flex-col items-center sm:items-end gap-2 px-4 print:hidden pointer-events-none">
         {toasts.map((t) => (
-          <div key={t.id} className={`px-4 py-3 rounded-lg shadow-lg text-sm text-white ${t.type === 'error' ? 'bg-red-600' : t.type === 'info' ? 'bg-slate-800' : 'bg-brand-700'}`}>{t.msg}</div>
+          <div key={t.id} className={`pointer-events-auto flex items-center gap-3 pl-3 pr-5 py-3 rounded-full shadow-lift text-sm font-medium animate-fade-up ${t.type === 'error' ? 'bg-clay-600 text-white' : t.type === 'info' ? 'bg-ink-900 text-white' : 'bg-brand-800 text-white'}`}>
+            <span className={`w-7 h-7 rounded-full grid place-items-center text-xs ${t.type === 'error' ? 'bg-white/20' : 'bg-gold-400 text-ink-900'}`}>{t.type === 'error' ? '!' : t.type === 'info' ? 'i' : '✓'}</span>{t.msg}
+          </div>
         ))}
       </div>
     </Ctx.Provider>
@@ -191,8 +193,11 @@ export const useStats = () => {
 function PageShell({ name }) {
   return (
     <div className="min-h-screen">
-      <div className="bg-brand-800 h-16 flex items-center px-4 text-white font-bold">{name || ''}</div>
-      <div className="bg-gradient-to-br from-brand-800 via-brand-700 to-brand-600 h-56" />
+      <div className="h-[68px] border-b border-sand-200 flex items-center px-4 gap-3">
+        <span className="w-10 h-10 rounded-2xl bg-brand-700" />
+        <span className="font-display text-lg text-ink-900">{name || ''}</span>
+      </div>
+      <div className="bg-brand-900 h-72 pattern-stars" />
     </div>
   );
 }
@@ -200,9 +205,10 @@ function PageShell({ name }) {
 function MasjidNotFound() {
   return (
     <div className="min-h-screen grid place-items-center p-4 text-center">
-      <div className="space-y-3">
-        <div className="text-2xl font-bold text-slate-800">Masjid not found</div>
-        <p className="text-slate-500 text-sm">This web address does not belong to any masjid on this site, or it has been paused.</p>
+      <div className="card max-w-md p-8 space-y-3">
+        <div className="text-4xl">🕌</div>
+        <div className="font-display text-2xl font-semibold text-ink-900">We couldn't find this masjid</div>
+        <p className="text-ink-500 text-sm">This address doesn't belong to a masjid on this site, or it's resting for now.</p>
         <a href="/" className="btn-primary">See all masjids</a>
       </div>
     </div>

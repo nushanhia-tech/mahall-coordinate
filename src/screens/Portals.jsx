@@ -10,14 +10,21 @@ import { CourseApplications, courseFields } from '../admin/CommunityAdmin';
 import { fmtDate, fmtDateTime, inr } from '../utils/format';
 
 const Tile = ({ icon: Icon, label, to, badge }) => (
-  <button onClick={() => navigate(to)} className="card flex flex-col items-center gap-2 py-5 hover:shadow-md hover:border-brand-300 relative">
-    <Icon className="text-brand-600" size={26} /><span className="text-sm font-semibold text-center">{label}</span>
-    {badge ? <span className="absolute top-2 right-2 badge bg-red-500 text-white">{badge}</span> : null}
+  <button onClick={() => navigate(to)} className="card card-hover flex flex-col items-center gap-3 !py-6 relative group">
+    <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-100 to-gold-50 text-brand-700 grid place-items-center group-hover:scale-105 transition"><Icon size={22} /></span>
+    <span className="text-sm font-semibold text-center text-ink-800">{label}</span>
+    {badge ? <span className="absolute top-3 right-3 badge bg-clay-500 text-white">{badge}</span> : null}
   </button>
 );
 
+const timeGreeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
+
 const Header = ({ user, subtitle }) => (
-  <div className="mb-6"><h1 className="text-2xl font-bold text-slate-800">Assalamu alaikum, {user.name}</h1><p className="text-sm text-slate-500">{subtitle}</p></div>
+  <div className="mb-8 animate-fade-up">
+    <div className="eyebrow">{timeGreeting()} · Assalamu alaikum</div>
+    <h1 className="font-display text-3xl md:text-4xl font-semibold text-ink-900 mt-1">Welcome, {user.name.split(' ')[0]}</h1>
+    <p className="text-ink-500 mt-2">{subtitle}</p>
+  </div>
 );
 
 export function IndividualPortal() {
@@ -29,7 +36,7 @@ export function IndividualPortal() {
   const myDonations = hh ? state.donations.filter((d) => d.phone === hh.phone) : [];
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <Header user={user} subtitle="Individual member portal" />
+      <Header user={user} subtitle="Your family, your applications and everything the Mahall offers – in one place." />
       <div className="grid md:grid-cols-3 gap-4 mb-6">
         <div className="card md:col-span-2">
           <h3 className="font-bold flex items-center gap-2 mb-2"><Home size={18} className="text-brand-600" />My household</h3>

@@ -1,7 +1,8 @@
 import { Lock } from 'lucide-react';
 import { useApp } from './store/AppContext';
 import { useRoute, navigate } from './router';
-import Navbar from './components/Navbar';
+import Navbar, { Logo } from './components/Navbar';
+import QuickFind from './components/QuickFind';
 import Dashboard from './screens/Dashboard';
 import Login from './screens/Login';
 import AdminPortal from './admin/AdminPortal';
@@ -19,10 +20,10 @@ function RequireLogin({ roles, children }) {
   const here = useRoute();
   if (user && (!roles || roles.includes(user.role))) return children;
   return (
-    <div className="max-w-md mx-auto my-16 card text-center">
-      <Lock className="mx-auto text-brand-600 mb-3" size={32} />
-      <h2 className="font-bold text-lg">{user ? 'You do not have access to this page' : 'Please log in to continue'}</h2>
-      <p className="text-sm text-slate-500 mt-1">{user ? `Your account role is "${user.role}".` : 'This page is available to registered Mahall members.'}</p>
+    <div className="max-w-md mx-auto my-20 card text-center p-8 animate-fade-up">
+      <div className="mx-auto mb-4 w-14 h-14 rounded-3xl bg-brand-50 text-brand-600 grid place-items-center"><Lock size={24} /></div>
+      <h2 className="font-display text-2xl font-semibold text-ink-900">{user ? 'This page is not for your account' : 'Please log in first'}</h2>
+      <p className="text-sm text-ink-500 mt-2">{user ? `You are logged in as ${user.role}. Ask your masjid admin if you need access.` : 'This part of the site is for registered members of the Mahall. It only takes a moment.'}</p>
       {!user && <button className="btn-primary mt-4" onClick={() => { sessionStorage.setItem('mahall-after-login', here); navigate('/login'); }}>Go to login</button>}
     </div>
   );
@@ -54,11 +55,30 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar path={path} />
-      <main className="flex-1">{match ? match[1](sub) : <div className="p-16 text-center text-slate-500">Page not found. <button className="text-brand-700 underline" onClick={() => navigate('/')}>Go home</button></div>}</main>
-      <footer className="bg-brand-900 text-brand-100 text-xs py-6 print:hidden">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-between gap-2">
-          <span>© {new Date().getFullYear()} {state.masjid.name} · Mahall Coordinating System · <a href="/" className="underline hover:text-white">All masjids</a></span>
-          <span>{state.masjid.address}</span>
+      <QuickFind />
+      <main className="flex-1">{match ? match[1](sub) : (
+        <div className="max-w-md mx-auto my-20 card text-center p-8">
+          <div className="text-4xl mb-2">🧭</div>
+          <h2 className="font-display text-2xl font-semibold">We couldn't find that page</h2>
+          <p className="text-sm text-ink-500 mt-2">It may have moved. Let's take you somewhere useful.</p>
+          <button className="btn-primary mt-5" onClick={() => navigate('/')}>Back to home</button>
+        </div>
+      )}</main>
+      <footer className="mt-16 bg-brand-900 text-brand-100 print:hidden relative overflow-hidden">
+        <div className="absolute inset-0 pattern-stars opacity-60" />
+        <div className="relative max-w-7xl mx-auto px-4 py-10 grid gap-6 md:grid-cols-3 items-start">
+          <div className="flex items-center gap-3">
+            <Logo size={44} />
+            <div>
+              <div className="font-display text-lg text-white">{state.masjid.name}</div>
+              <div className="text-xs text-brand-200">{state.masjid.address}</div>
+            </div>
+          </div>
+          <p className="text-sm text-brand-100/90 italic font-display md:text-center">“The best of people are those most beneficial to people.”</p>
+          <div className="text-xs text-brand-200 md:text-right space-y-1">
+            <div>Made with care for our community · {new Date().getFullYear()}</div>
+            <a href="/" className="inline-block underline decoration-brand-500 underline-offset-4 hover:text-white">See all masjids</a>
+          </div>
         </div>
       </footer>
     </div>

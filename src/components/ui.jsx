@@ -6,13 +6,13 @@ import { useApp } from '../store/AppContext';
 export function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onMouseDown={onClose}>
-      <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} my-8`} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b">
-          <h3 className="font-bold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100" aria-label="Close"><X size={18} /></button>
+    <div className="fixed inset-0 z-50 bg-ink-900/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onMouseDown={onClose}>
+      <div className={`bg-white rounded-4xl shadow-lift w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} my-8 animate-fade-up`} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 pt-5 pb-3">
+          <h3 className="font-display text-xl font-semibold text-ink-900">{title}</h3>
+          <button onClick={onClose} className="p-2 rounded-full text-ink-500 hover:bg-sand-100 hover:text-ink-800" aria-label="Close"><X size={18} /></button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="px-6 pb-6">{children}</div>
       </div>
     </div>
   );
@@ -41,34 +41,40 @@ export function ImageInput({ value, onChange, label = 'Upload image', accept = '
 }
 
 const STATUS_COLORS = {
-  pending: 'bg-amber-100 text-amber-800', approved: 'bg-green-100 text-green-800', confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-700', active: 'bg-blue-100 text-blue-800', returned: 'bg-slate-200 text-slate-700',
-  overdue: 'bg-red-100 text-red-700', live: 'bg-green-100 text-green-800', ended: 'bg-slate-200 text-slate-700', income: 'bg-green-100 text-green-800', expense: 'bg-red-100 text-red-700',
+  pending: 'bg-gold-100 text-gold-600', approved: 'bg-brand-100 text-brand-700', confirmed: 'bg-brand-100 text-brand-700',
+  rejected: 'bg-clay-100 text-clay-600', active: 'bg-sky-100 text-sky-700', returned: 'bg-sand-200 text-ink-600',
+  overdue: 'bg-clay-100 text-clay-600', live: 'bg-brand-100 text-brand-700', ended: 'bg-sand-200 text-ink-600', income: 'bg-brand-100 text-brand-700', expense: 'bg-clay-100 text-clay-600',
 };
-export const StatusBadge = ({ status }) => <span className={`badge capitalize ${STATUS_COLORS[status] || 'bg-slate-100 text-slate-700'}`}>{status}</span>;
+const DOTS = { pending: 'bg-gold-500', approved: 'bg-brand-500', confirmed: 'bg-brand-500', rejected: 'bg-clay-500', active: 'bg-sky-500', overdue: 'bg-clay-500', live: 'bg-brand-500 animate-pulse', income: 'bg-brand-500', expense: 'bg-clay-500' };
+export const StatusBadge = ({ status }) => <span className={`badge capitalize ${STATUS_COLORS[status] || 'bg-sand-200 text-ink-600'}`}><span className={`w-1.5 h-1.5 rounded-full ${DOTS[status] || 'bg-ink-400'}`} />{status}</span>;
 
 export function Tabs({ tabs, active, onChange }) {
   return (
-    <div className="flex flex-wrap gap-1 border-b border-slate-200 mb-4">
+    <div className="inline-flex flex-wrap gap-1 p-1 mb-5 rounded-full bg-white border border-sand-200 shadow-soft max-w-full overflow-x-auto scrollbar-none">
       {tabs.map((t) => (
-        <button key={t.id} onClick={() => onChange(t.id)} className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${active === t.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-          {t.label}{t.count ? <span className="ml-1.5 badge bg-red-500 text-white">{t.count}</span> : null}
+        <button key={t.id} onClick={() => onChange(t.id)} className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition ${active === t.id ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-800 hover:bg-sand-100'}`}>
+          {t.label}{t.count ? <span className={`ml-1.5 badge ${active === t.id ? 'bg-white/25 text-white' : 'bg-clay-500 text-white'}`}>{t.count}</span> : null}
         </button>
       ))}
     </div>
   );
 }
 
-export const Empty = ({ children = 'Nothing here yet.' }) => <div className="text-center text-sm text-slate-400 py-8">{children}</div>;
+export const Empty = ({ children = 'Nothing here yet.' }) => (
+  <div className="text-center py-10">
+    <div className="mx-auto mb-3 w-12 h-12 rounded-2xl bg-sand-100 grid place-items-center text-xl">🌙</div>
+    <div className="text-sm text-ink-400">{children}</div>
+  </div>
+);
 
 export const StatCard = ({ icon: Icon, label, value, color = 'brand' }) => {
-  const colors = { brand: 'bg-brand-100 text-brand-700', blue: 'bg-blue-100 text-blue-700', amber: 'bg-amber-100 text-amber-700', purple: 'bg-purple-100 text-purple-700', red: 'bg-red-100 text-red-700' };
+  const colors = { brand: 'from-brand-100 to-brand-50 text-brand-700', blue: 'from-sky-100 to-sky-50 text-sky-700', amber: 'from-gold-100 to-gold-50 text-gold-600', purple: 'from-violet-100 to-violet-50 text-violet-700', red: 'from-clay-100 to-clay-50 text-clay-600' };
   return (
-    <div className="card flex items-center gap-4">
-      <div className={`p-3 rounded-xl ${colors[color]}`}><Icon size={22} /></div>
-      <div>
-        <div className="text-2xl font-bold text-slate-800">{value}</div>
-        <div className="text-xs text-slate-500 font-medium">{label}</div>
+    <div className="card card-hover flex items-center gap-4 animate-fade-up">
+      <div className={`w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br grid place-items-center ${colors[color]}`}><Icon size={22} /></div>
+      <div className="min-w-0">
+        <div className="text-2xl font-extrabold text-ink-900 tabular-nums truncate">{value}</div>
+        <div className="text-xs text-ink-500 font-medium">{label}</div>
       </div>
     </div>
   );
@@ -94,12 +100,12 @@ export function CrudManager({ title, items, fields, onAdd, onUpdate, onDelete, d
   return (
     <div className="card">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h3 className="h2">{title} <span className="text-sm text-slate-400 font-normal">({items.length})</span></h3>
+        <h3 className="h2">{title} <span className="ml-1 badge bg-sand-200 text-ink-600 align-middle">{items.length}</span></h3>
         <div className="flex gap-2">
           {searchKeys && (
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
-              <input className="input pl-8 w-48" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <Search size={14} className="absolute left-3.5 top-3 text-ink-400" />
+              <input className="input pl-9 w-52" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
           )}
           <button className="btn-primary" onClick={() => setEditing({ ...defaults })}><Plus size={16} /> {addLabel}</button>
@@ -110,7 +116,7 @@ export function CrudManager({ title, items, fields, onAdd, onUpdate, onDelete, d
           <thead><tr>{cols.map((c) => <th key={c.name}>{c.label}</th>)}<th className="text-right">Actions</th></tr></thead>
           <tbody>
             {list.map((it) => (
-              <tr key={it.id} className="hover:bg-slate-50">
+              <tr key={it.id}>
                 {cols.map((c) => (
                   <td key={c.name}>
                     {c.render ? c.render(it) : c.type === 'image' ? (it[c.name] ? <img src={it[c.name]} alt="" className="h-10 w-10 object-cover rounded" /> : '—') : c.type === 'password' ? '••••••' : String(it[c.name] ?? '')}
@@ -118,8 +124,8 @@ export function CrudManager({ title, items, fields, onAdd, onUpdate, onDelete, d
                 ))}
                 <td className="text-right whitespace-nowrap">
                   {extraActions?.(it)}
-                  <button className="p-1.5 text-slate-500 hover:text-brand-700" title="Edit" onClick={() => setEditing({ ...it })}><Pencil size={15} /></button>
-                  {canDelete(it) && <button className="p-1.5 text-slate-500 hover:text-red-600" title="Delete" onClick={async () => { if (await ask({ title: 'Delete record?', message: 'This cannot be undone.', danger: true, okLabel: 'Delete' })) onDelete(it.id); }}><Trash2 size={15} /></button>}
+                  <button className="p-2 rounded-full text-ink-400 hover:text-brand-700 hover:bg-brand-50" title="Edit" onClick={() => setEditing({ ...it })}><Pencil size={15} /></button>
+                  {canDelete(it) && <button className="p-2 rounded-full text-ink-400 hover:text-clay-600 hover:bg-clay-50" title="Delete" onClick={async () => { if (await ask({ title: 'Delete record?', message: 'This cannot be undone.', danger: true, okLabel: 'Delete' })) onDelete(it.id); }}><Trash2 size={15} /></button>}
                 </td>
               </tr>
             ))}
@@ -162,8 +168,8 @@ export function SectionTitle({ icon: Icon, title, subtitle, action }) {
   return (
     <div className="flex items-end justify-between mb-4 gap-3">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">{Icon && <Icon className="text-brand-600" size={24} />}{title}</h2>
-        {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+        <h2 className="font-display text-3xl font-semibold text-ink-900 flex items-center gap-3">{Icon && <span className="w-10 h-10 rounded-2xl bg-brand-50 text-brand-600 grid place-items-center"><Icon size={20} /></span>}{title}</h2>
+        {subtitle && <p className="text-sm text-ink-500 mt-1.5 max-w-2xl">{subtitle}</p>}
       </div>
       {action}
     </div>

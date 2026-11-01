@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, Moon } from 'lucide-react';
+import { Menu, X, LogOut, ChevronDown, Moon, Sparkles } from 'lucide-react';
+import { openQuickFind } from './QuickFind';
 import { useApp } from '../store/AppContext';
 import { navigate } from '../router';
 
@@ -10,63 +11,85 @@ const groups = [
   { label: 'Apply', items: [['Nikkah Application', '/apply/nikkah'], ['New Home Number', '/apply/home'], ['Mediation Chat', '/mediation']] },
 ];
 
+// A small crescent-and-dome mark used as the logo.
+export const Logo = ({ size = 40 }) => (
+  <span className="relative grid place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 text-gold-300 shadow-glow shrink-0" style={{ width: size, height: size }}>
+    <Moon size={size * 0.48} fill="currentColor" strokeWidth={1.5} />
+    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-gold-400 ring-2 ring-sand-100" />
+  </span>
+);
+
 export default function Navbar({ path }) {
   const { state, user, logout } = useApp();
   const [open, setOpen] = useState(false);
   const [drop, setDrop] = useState('');
   const go = (p) => { navigate(p); setOpen(false); setDrop(''); };
   const link = (label, p) => (
-    <button key={p} onClick={() => go(p)} className={`px-3 py-2 rounded-lg text-sm font-medium ${path === p ? 'bg-white/15 text-white' : 'text-brand-50 hover:bg-white/10'}`}>{label}</button>
+    <button key={p} onClick={() => go(p)} className={`px-3.5 py-2 rounded-full text-sm font-semibold transition ${path === p ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-600 hover:text-ink-900 hover:bg-white'}`}>{label}</button>
   );
+  const initials = (user?.name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
   return (
-    <header className="bg-brand-800 text-white sticky top-0 z-40 shadow print:hidden">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <button onClick={() => go('/')} className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-full bg-gold-400 text-brand-900 grid place-items-center"><Moon size={18} fill="currentColor" /></div>
-          <div className="text-left leading-tight">
-            <div className="font-bold">{state.masjid.name}</div>
-            <div className="text-[10px] uppercase tracking-wider text-brand-100">Mahall Coordinating System</div>
-          </div>
-        </button>
-        <nav className="hidden lg:flex items-center gap-1">
-          {link('Home', '/')}
-          {groups.map((g) => (
-            <div key={g.label} className="relative" onMouseLeave={() => setDrop('')}>
-              <button onMouseEnter={() => setDrop(g.label)} onClick={() => setDrop(drop === g.label ? '' : g.label)} className="px-3 py-2 rounded-lg text-sm font-medium text-brand-50 hover:bg-white/10 flex items-center gap-1">{g.label} <ChevronDown size={14} /></button>
-              {drop === g.label && (
-                <div className="absolute right-0 pt-1 w-56">
-                  <div className="bg-white text-slate-700 rounded-lg shadow-lg py-1">
-                    {g.items.map(([l, p]) => <button key={p} onClick={() => go(p)} className="block w-full text-left px-4 py-2 text-sm hover:bg-brand-50">{l}</button>)}
-                  </div>
-                </div>
-              )}
+    <header className="sticky top-0 z-40 print:hidden">
+      <div className="bg-sand-100/80 backdrop-blur-xl border-b border-sand-200/80">
+        <div className="max-w-7xl mx-auto px-4 h-[68px] flex items-center justify-between gap-3">
+          <button onClick={() => go('/')} className="flex items-center gap-3 min-w-0">
+            <Logo />
+            <div className="text-left leading-tight min-w-0">
+              <div className="font-display font-semibold text-[17px] text-ink-900 truncate">{state.masjid.name}</div>
+              <div className="text-[10px] uppercase tracking-[.2em] text-ink-400 font-semibold">Mahall community</div>
             </div>
-          ))}
-          {link('Courses', '/courses')}
-          {link('Opportunities', '/opportunities')}
-          {user ? (
-            <>
-              <button onClick={() => go(portalPath(user))} className="ml-2 btn bg-gold-400 text-brand-900 hover:bg-gold-500"><LayoutDashboard size={16} /> My Portal</button>
-              <button onClick={async () => { await logout(); go('/'); }} className="p-2 rounded-lg hover:bg-white/10" title="Log out"><LogOut size={18} /></button>
-            </>
-          ) : (
-            <button onClick={() => go('/login')} className="ml-2 btn bg-gold-400 text-brand-900 hover:bg-gold-500">Login</button>
-          )}
-        </nav>
-        <button className="lg:hidden p-2" onClick={() => setOpen(!open)} aria-label="Menu">{open ? <X /> : <Menu />}</button>
+          </button>
+          <nav className="hidden lg:flex items-center gap-1">
+            {link('Home', '/')}
+            {groups.map((g) => (
+              <div key={g.label} className="relative" onMouseLeave={() => setDrop('')}>
+                <button onMouseEnter={() => setDrop(g.label)} onClick={() => setDrop(drop === g.label ? '' : g.label)} className="px-3.5 py-2 rounded-full text-sm font-semibold text-ink-600 hover:text-ink-900 hover:bg-white flex items-center gap-1">{g.label} <ChevronDown size={14} className={`transition ${drop === g.label ? 'rotate-180' : ''}`} /></button>
+                {drop === g.label && (
+                  <div className="absolute right-0 pt-2 w-60">
+                    <div className="bg-white rounded-3xl shadow-lift border border-sand-200 p-2 animate-fade-up">
+                      {g.items.map(([l, p]) => <button key={p} onClick={() => go(p)} className="block w-full text-left px-4 py-2.5 rounded-2xl text-sm font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-700">{l}</button>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {link('Courses', '/courses')}
+            {link('Opportunities', '/opportunities')}
+          </nav>
+          <div className="flex items-center gap-2">
+            <button onClick={openQuickFind} className="hidden md:flex items-center gap-2 h-10 pl-3 pr-2 rounded-full bg-white border border-sand-300 text-ink-400 text-sm hover:border-brand-300 hover:text-ink-600 transition" title="Quick find (Ctrl + K)">
+              <Sparkles size={15} className="text-gold-500" /><span className="hidden xl:inline">Ask or find…</span>
+              <kbd className="text-[10px] font-semibold border border-sand-300 rounded-md px-1.5 py-0.5">Ctrl K</kbd>
+            </button>
+            <button onClick={openQuickFind} className="md:hidden w-10 h-10 grid place-items-center rounded-full bg-white border border-sand-300 text-gold-500" aria-label="Quick find"><Sparkles size={17} /></button>
+            {user ? (
+              <>
+                <button onClick={() => go(portalPath(user))} className="hidden sm:flex items-center gap-2 h-10 pl-1 pr-4 rounded-full bg-ink-900 text-white text-sm font-semibold hover:bg-ink-800 transition">
+                  <span className="w-8 h-8 rounded-full bg-gold-400 text-ink-900 grid place-items-center text-xs font-extrabold">{initials}</span>My portal
+                </button>
+                <button onClick={async () => { await logout(); go('/'); }} className="hidden sm:grid w-10 h-10 place-items-center rounded-full text-ink-500 hover:bg-white hover:text-clay-600" title="Log out"><LogOut size={17} /></button>
+              </>
+            ) : (
+              <button onClick={() => go('/login')} className="hidden sm:inline-flex btn-primary">Log in</button>
+            )}
+            <button className="lg:hidden w-10 h-10 grid place-items-center rounded-full bg-white border border-sand-300 text-ink-700" onClick={() => setOpen(!open)} aria-label="Menu">{open ? <X size={18} /> : <Menu size={18} />}</button>
+          </div>
+        </div>
       </div>
       {open && (
-        <div className="lg:hidden bg-brand-900 px-4 pb-4 space-y-1">
+        <div className="lg:hidden absolute inset-x-3 top-[76px] bg-white rounded-4xl shadow-lift border border-sand-200 p-3 space-y-1 animate-fade-up">
           {[['Home', '/'], ...groups.flatMap((g) => g.items), ['Courses', '/courses'], ['Opportunities', '/opportunities']].map(([l, p]) => (
-            <button key={p} onClick={() => go(p)} className="block w-full text-left px-3 py-2 rounded hover:bg-white/10 text-sm">{l}</button>
+            <button key={p} onClick={() => go(p)} className={`block w-full text-left px-4 py-3 rounded-2xl text-sm font-semibold ${path === p ? 'bg-brand-50 text-brand-700' : 'text-ink-700 hover:bg-sand-100'}`}>{l}</button>
           ))}
-          {user ? (
-            <>
-              <button onClick={() => go(portalPath(user))} className="block w-full text-left px-3 py-2 rounded bg-gold-400 text-brand-900 text-sm font-semibold">My Portal</button>
-              <button onClick={async () => { await logout(); go('/'); }} className="block w-full text-left px-3 py-2 text-sm">Log out</button>
-            </>
-          ) : <button onClick={() => go('/login')} className="block w-full text-left px-3 py-2 rounded bg-gold-400 text-brand-900 text-sm font-semibold">Login</button>}
+          <div className="pt-2 grid grid-cols-2 gap-2">
+            {user ? (
+              <>
+                <button onClick={() => go(portalPath(user))} className="btn-primary">My portal</button>
+                <button onClick={async () => { await logout(); go('/'); }} className="btn-outline">Log out</button>
+              </>
+            ) : <button onClick={() => go('/login')} className="btn-primary col-span-2">Log in</button>}
+          </div>
         </div>
       )}
     </header>
