@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ShoppingCart, Plus, Minus, Trash2, FileDown, RotateCcw, AlertTriangle, Package } from 'lucide-react';
-import { useApp } from '../store/AppContext';
+import { useApp, useFeature } from '../store/AppContext';
+import { featureOn } from '../utils/features';
 import { usePhoneLookup, CrudManager, Field, Modal, StatusBadge, Tabs, Empty, SectionTitle } from '../components/ui';
 import { inr, pdfInr, fmtDateTime, fmtDuration, cheapestPenalty, UNIT_MS, UNIT_LABEL } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
@@ -20,23 +21,37 @@ export function rentalBillPdf(state, r) {
       { heading: 'Items' },
       { table: { head: ['Item', 'Qty', 'Rate', 'Period', 'Amount'], body: lines, foot: [['', '', '', 'Base rent', pdfInr(r.baseAmount)]] } },
       ...(r.penalty ? [{ heading: 'Late return penalty' }, { text: r.penaltyDetail }] : []),
-      { kv: [['Base rent', pdfInr(r.baseAmount)], ['Penalty', pdfInr(r.penalty || 0)], ['TOTAL PAYABLE', pdfInr((r.baseAmount || 0) + (r.penalty || 0))]] },
+      { kv: (() => {
+        const total = (r.baseAmount || 0) + (r.penalty || 0);
+        const adv = r.advancePaid ? Number(r.advanceAmount || 0) : 0;
+        const rows = [['Base rent', pdfInr(r.baseAmount)], ['Penalty', pdfInr(r.penalty || 0)], ['TOTAL RENT', pdfInr(total)]];
+        if (adv) rows.push(['Advance received', `- ${pdfInr(adv)} (${r.advanceMethod || 'cash'}, ${fmtDateTime(r.advanceReceivedAt)})`], [total - adv >= 0 ? 'BALANCE TO PAY' : 'REFUND TO CUSTOMER', pdfInr(Math.abs(total - adv))]);
+        else if (Number(r.advanceAmount)) rows.push(['Advance', `${pdfInr(r.advanceAmount)} – not received`]);
+        return rows;
+      })() },
       ...(r.remark ? [{ heading: 'Return remark' }, { text: r.remark }] : []),
       { text: 'Penalty rule: overdue time is rounded up to whole hours, days, weeks and months, and the cheapest of those is charged.' },
     ],
   }, `rental-bill-${r.id}.pdf`);
 }
 
+const UNIT_KEYS = { hour: 'rentHour', day: 'rentDay', week: 'rentWeek', month: 'rentMonth' };
+
 export default function RentalPage() {
   const { state, add, toast, user } = useApp();
+  const enabled = useFeature('rental', { forAdmins: true });
+  const advOn = useFeature('rentAdvance');
+  const lookupOn = useFeature('rentMyBookings');
+  const shownUnits = UNITS.filter((u) => featureOn(state.config, UNIT_KEYS[u]));
   const [cart, setCart] = useState({});
-  const [unit, setUnit] = useState('day');
+  const [unit, setUnit] = useState(() => (shownUnits.includes('day') ? 'day' : shownUnits[0] || 'day'));
   const [duration, setDuration] = useState(1);
   const [book, setBook] = useState(null);
   const [lookup, setLookup] = useState('');
   const items = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => ({ item: state.rentalItems.find((i) => i.id === id), qty })).filter((x) => x.item);
   const unitOk = (u) => items.every(({ item }) => Number(item.rates[u]) > 0);
   const total = items.reduce((a, { item, qty }) => a + qty * Number(item.rates[unit] || 0) * duration, 0);
+  const advance = advOn ? items.reduce((a, { item, qty }) => a + qty * Number(item.advance || 0), 0) : 0;
   const avail = (it) => it.stock - rentedQty(state, it.id);
   const setQty = (it, q) => setCart({ ...cart, [it.id]: Math.max(0, Math.min(avail(it), q)) });
 
@@ -44,13 +59,14 @@ export default function RentalPage() {
     e.preventDefault();
     if (!unitOk(unit)) return toast(`Some items cannot be rented per ${unit}`, 'error');
     const start = new Date(book.start);
-    const r = { name: book.name, phone: book.phone, items: items.map(({ item, qty }) => ({ itemId: item.id, qty })), unit, duration: Number(duration), start: start.toISOString(), due: new Date(start.getTime() + duration * UNIT_MS[unit]).toISOString(), status: 'active', baseAmount: total, returnedAt: '', remark: '', penalty: 0, penaltyDetail: '' };
+    const r = { name: book.name, phone: book.phone, items: items.map(({ item, qty }) => ({ itemId: item.id, qty })), unit, duration: Number(duration), start: start.toISOString(), due: new Date(start.getTime() + duration * UNIT_MS[unit]).toISOString(), status: 'active', baseAmount: total, advanceAmount: advance, advancePaid: false, returnedAt: '', remark: '', penalty: 0, penaltyDetail: '' };
     add('rentals', r);
-    toast('Booking confirmed! Collect items from the Mahall office.');
+    toast(advance ? `Booking confirmed! Please pay the advance of ${inr(advance)} when you collect the items.` : 'Booking confirmed! Collect items from the Mahall office.');
     setCart({}); setBook(null); setLookup(book.phone);
   };
   const mine = usePhoneLookup('rentals', lookup);
 
+  if (!enabled) return <div className="max-w-md mx-auto my-20 card text-center p-8"><div className="text-3xl">🛒</div><h2 className="font-display text-2xl mt-2">The rental service is closed</h2><p className="text-sm text-ink-500 mt-2">Please contact the Mahall office.</p></div>;
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <SectionTitle icon={ShoppingCart} title="Rental Cart" subtitle="Hire Mahall items by the hour, day, week or month." />
@@ -64,8 +80,8 @@ export default function RentalPage() {
                   {it.image ? <img src={it.image} alt="" className="w-16 h-16 rounded object-cover" /> : <div className="w-16 h-16 rounded bg-blue-50 grid place-items-center"><Package className="text-blue-600" /></div>}
                   <div className="flex-1"><div className="font-bold">{it.name}</div><div className="text-xs text-slate-500">{it.description}</div><div className={`text-xs mt-1 ${a ? 'text-green-700' : 'text-red-600'}`}>{a} of {it.stock} available</div></div>
                 </div>
-                <div className="grid grid-cols-4 gap-1 text-center text-xs my-3">
-                  {UNITS.map((u) => <div key={u} className={`rounded p-1 ${u === unit ? 'bg-brand-100 text-brand-800 font-semibold' : 'bg-slate-50'}`}><div className="text-[10px] uppercase text-slate-400">{u}</div>{Number(it.rates[u]) ? inr(it.rates[u]) : '—'}</div>)}
+                <div className={`grid gap-1 text-center text-xs my-3`} style={{ gridTemplateColumns: `repeat(${Math.max(shownUnits.length, 1)}, minmax(0, 1fr))` }}>
+                  {shownUnits.map((u) => <div key={u} className={`rounded p-1 ${u === unit ? 'bg-brand-100 text-brand-800 font-semibold' : 'bg-slate-50'}`}><div className="text-[10px] uppercase text-slate-400">{u}</div>{Number(it.rates[u]) ? inr(it.rates[u]) : '—'}</div>)}
                 </div>
                 <div className="mt-auto flex items-center gap-2">
                   <button className="btn-outline btn-sm" onClick={() => setQty(it, (cart[it.id] || 0) - 1)} aria-label="Less"><Minus size={12} /></button>
@@ -89,15 +105,16 @@ export default function RentalPage() {
                   </div>
                 ))}
                 <div className="grid grid-cols-2 gap-2 mt-3">
-                  <Field label="Rent per"><select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>{UNITS.map((u) => <option key={u} value={u} disabled={!unitOk(u)}>{UNIT_LABEL[u]}{!unitOk(u) ? ' (n/a)' : ''}</option>)}</select></Field>
+                  <Field label="Rent per"><select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>{shownUnits.map((u) => <option key={u} value={u} disabled={!unitOk(u)}>{UNIT_LABEL[u]}{!unitOk(u) ? ' (n/a)' : ''}</option>)}</select></Field>
                   <Field label={`Number of ${unit}s`}><input type="number" min="1" className="input" value={duration} onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))} /></Field>
                 </div>
-                <div className="flex justify-between font-bold text-lg mt-4"><span>Total</span><span>{inr(total)}</span></div>
+                <div className="flex justify-between font-bold text-lg mt-4"><span>Rent</span><span>{inr(total)}</span></div>
+                {advance > 0 && <div className="flex justify-between text-sm mt-1 rounded-xl bg-gold-50 px-3 py-2"><span>Advance at pickup <span className="text-xs text-ink-500">(adjusted on return)</span></span><b>{inr(advance)}</b></div>}
                 <button className="btn-primary w-full mt-3" disabled={!unitOk(unit)} onClick={() => setBook({ name: user?.name || '', phone: '', start: localNow() })}>Book now</button>
               </>
             ) : <Empty>Your cart is empty.</Empty>}
           </div>
-          <div className="card">
+          {lookupOn && <div className="card">
             <h3 className="font-bold mb-2">My bookings</h3>
             <input className="input" placeholder="Enter your phone number" value={lookup} onChange={(e) => setLookup(e.target.value)} />
             <div className="mt-3 space-y-2">
@@ -109,7 +126,7 @@ export default function RentalPage() {
               ))}
               {lookup.trim().length >= 10 && !mine.length && <div className="text-xs text-slate-400">No bookings for this number.</div>}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
       <Modal open={!!book} onClose={() => setBook(null)} title="Confirm booking">
@@ -118,7 +135,7 @@ export default function RentalPage() {
             <Field label="Your name *"><input className="input" required value={book.name} onChange={(e) => setBook({ ...book, name: e.target.value })} /></Field>
             <Field label="Phone *"><input className="input" required pattern="[0-9+ ]{10,14}" value={book.phone} onChange={(e) => setBook({ ...book, phone: e.target.value })} /></Field>
             <Field label="Pick-up time *"><input type="datetime-local" className="input" required value={book.start} onChange={(e) => setBook({ ...book, start: e.target.value })} /></Field>
-            <p className="text-sm bg-slate-50 rounded p-3">{duration} {unit}(s) · Return by <b>{fmtDateTime(new Date(new Date(book.start).getTime() + duration * UNIT_MS[unit]))}</b> · Total <b>{inr(total)}</b><br /><span className="text-xs text-slate-500">Late returns are charged at the cheapest rate that covers the extra time.</span></p>
+            <p className="text-sm bg-slate-50 rounded p-3">{duration} {unit}(s) · Return by <b>{fmtDateTime(new Date(new Date(book.start).getTime() + duration * UNIT_MS[unit]))}</b> · Rent <b>{inr(total)}</b>{advance > 0 && <> · Advance at pickup <b>{inr(advance)}</b></>}<br /><span className="text-xs text-slate-500">Late returns are charged at the cheapest rate that covers the extra time.</span></p>
             <div className="flex justify-end gap-2"><button type="button" className="btn-outline" onClick={() => setBook(null)}>Cancel</button><button className="btn-primary">Confirm booking</button></div>
           </form>
         )}
@@ -128,7 +145,7 @@ export default function RentalPage() {
 }
 
 export function RentalAdmin() {
-  const { state, add, patch, remove, update, toast } = useApp();
+  const { state, add, patch, remove, update, toast, ask } = useApp();
   const [tab, setTab] = useState('active');
   const [ret, setRet] = useState(null);
   const active = state.rentals.filter((r) => r.status === 'active').sort((a, b) => a.due.localeCompare(b.due));
@@ -148,14 +165,21 @@ export function RentalAdmin() {
     const at = new Date();
     const { penalty, detail } = calc(ret, at);
     const r = { ...ret, status: 'returned', returnedAt: at.toISOString(), penalty, penaltyDetail: detail, total: ret.baseAmount + penalty };
-    update((s) => { const i = s.rentals.findIndex((x) => x.id === r.id); s.rentals[i] = r; if (ret.postIncome) s.transactions.push({ id: 'txn_' + r.id, date: at.toISOString().slice(0, 10), type: 'income', head: ret.head, amount: r.total, description: `Rental – ${r.name}`, receipt: '' }); });
-    toast(`Returned. Total ${inr(r.total)}${penalty ? ` (incl. ${inr(penalty)} penalty)` : ''}`);
+    update((s) => { const i = s.rentals.findIndex((x) => x.id === r.id); s.rentals[i] = r; if (ret.postIncome) s.transactions.push({ id: 'txn_' + r.id, date: at.toISOString().slice(0, 10), type: 'income', head: ret.head, amount: r.total, description: `Rental – ${r.name}`, receipt: '', ref: r.id }); });
+    const adv = r.advancePaid ? Number(r.advanceAmount || 0) : 0;
+    toast(`Returned. Total ${inr(r.total)}${penalty ? ` (incl. ${inr(penalty)} penalty)` : ''}${adv ? ` · ${r.total - adv >= 0 ? `collect ${inr(r.total - adv)}` : `refund ${inr(adv - r.total)}`}` : ''}`);
     rentalBillPdf(state, r);
     setRet(null);
   };
 
   const flatItems = state.rentalItems.map((i) => ({ ...i, rHour: i.rates.hour, rDay: i.rates.day, rWeek: i.rates.week, rMonth: i.rates.month }));
-  const unflat = (d) => { const { rHour, rDay, rWeek, rMonth, ...rest } = d; return { ...rest, stock: Number(rest.stock), rates: { hour: Number(rHour) || 0, day: Number(rDay) || 0, week: Number(rWeek) || 0, month: Number(rMonth) || 0 } }; };
+  const unflat = (d) => { const { rHour, rDay, rWeek, rMonth, ...rest } = d; return { ...rest, stock: Number(rest.stock), advance: Number(rest.advance) || 0, rates: { hour: Number(rHour) || 0, day: Number(rDay) || 0, week: Number(rWeek) || 0, month: Number(rMonth) || 0 } }; };
+  const takeAdvance = async (r) => {
+    const how = await ask({ title: `Advance of ${inr(r.advanceAmount)} received?`, message: 'Type "cash", or the UPI reference number.', input: true, required: true, defaultValue: 'cash', okLabel: 'Mark received' });
+    if (!how) return;
+    patch('rentals', r.id, { advancePaid: true, advanceMethod: how, advanceReceivedAt: new Date().toISOString() });
+    toast('Advance recorded');
+  };
 
   const Row = ({ r }) => (
     <tr className={isOverdue(r) ? 'bg-red-50' : ''}>
@@ -163,8 +187,10 @@ export function RentalAdmin() {
       <td className="text-xs">{r.items.map((i) => <div key={i.itemId}>{itemName(i.itemId)} × {i.qty}</div>)}</td>
       <td className="text-xs">{r.duration} {r.unit}(s)<br />{fmtDateTime(r.start)}</td>
       <td className="text-xs">{fmtDateTime(r.due)}{isOverdue(r) && <div className="text-red-600 font-semibold flex items-center gap-1"><AlertTriangle size={11} />{fmtDuration(Date.now() - new Date(r.due))} late</div>}{r.returnedAt && <div>Returned {fmtDateTime(r.returnedAt)}</div>}</td>
-      <td className="text-right">{inr(r.baseAmount)}{r.penalty ? <div className="text-xs text-red-600">+{inr(r.penalty)} penalty</div> : null}</td>
+      <td className="text-right">{inr(r.baseAmount)}{r.penalty ? <div className="text-xs text-red-600">+{inr(r.penalty)} penalty</div> : null}
+        {Number(r.advanceAmount) > 0 && <div className={`text-xs ${r.advancePaid ? 'text-brand-700' : 'text-gold-600'}`}>Advance {inr(r.advanceAmount)} · {r.advancePaid ? 'received' : 'not received'}</div>}</td>
       <td className="text-right whitespace-nowrap">
+        {r.status === 'active' && Number(r.advanceAmount) > 0 && !r.advancePaid && <button className="btn-gold btn-sm mr-1" onClick={() => takeAdvance(r)}>Advance received</button>}
         {r.status === 'active' ? <button className="btn-primary btn-sm mr-1" onClick={() => setRet({ ...r, remark: '', postIncome: true, head: state.accountHeads[0] })}><RotateCcw size={12} />Return</button> : <span className="text-xs text-slate-500 mr-2" title={r.remark}>{r.remark}</span>}
         <button className="btn-outline btn-sm" onClick={() => rentalBillPdf(state, r)}><FileDown size={12} />Bill</button>
       </td>
@@ -190,6 +216,7 @@ export function RentalAdmin() {
           { name: 'rDay', label: '₹/Day', type: 'number', min: 0 },
           { name: 'rWeek', label: '₹/Week', type: 'number', min: 0 },
           { name: 'rMonth', label: '₹/Month', type: 'number', min: 0 },
+          { name: 'advance', label: 'Advance (₹ per item)', type: 'number', min: 0, render: (i) => (Number(i.advance) ? inr(i.advance) : '—') },
           { name: 'description', label: 'Description', type: 'textarea', table: false },
         ]}
           onAdd={(d) => { add('rentalItems', unflat(d)); toast('Product added'); }}
@@ -203,7 +230,9 @@ export function RentalAdmin() {
               <div><b>{ret.name}</b> · due {fmtDateTime(ret.due)}</div>
               <div>Base rent: <b>{inr(ret.baseAmount)}</b></div>
               {preview.over > 0 ? <div className="text-red-700">Late by {fmtDuration(preview.over)} → penalty <b>{inr(preview.penalty)}</b><div className="text-xs">{preview.detail}</div></div> : <div className="text-green-700">Returned on time – no penalty.</div>}
-              <div className="text-base">Total: <b>{inr(ret.baseAmount + preview.penalty)}</b></div>
+              <div className="text-base">Total rent: <b>{inr(ret.baseAmount + preview.penalty)}</b></div>
+              {ret.advancePaid && Number(ret.advanceAmount) > 0 && (() => { const bal = ret.baseAmount + preview.penalty - Number(ret.advanceAmount); return <div className="rounded-xl bg-gold-50 px-3 py-2">Advance received {inr(ret.advanceAmount)} → <b>{bal >= 0 ? `collect ${inr(bal)}` : `refund ${inr(-bal)}`}</b></div>; })()}
+              {!ret.advancePaid && Number(ret.advanceAmount) > 0 && <div className="text-xs text-gold-600">The advance of {inr(ret.advanceAmount)} was not received.</div>}
             </div>
             <Field label="Remark (condition of items etc.)"><textarea className="input" rows={2} value={ret.remark} onChange={(e) => setRet({ ...ret, remark: e.target.value })} /></Field>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ret.postIncome} onChange={(e) => setRet({ ...ret, postIncome: e.target.checked })} /> Record payment as income in</label>

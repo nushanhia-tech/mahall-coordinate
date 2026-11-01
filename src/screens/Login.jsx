@@ -35,11 +35,12 @@ export default function Login() {
     <div className="max-w-5xl mx-auto px-4 py-10 md:py-16">
       <div className="grid md:grid-cols-2 rounded-4xl overflow-hidden shadow-lift border border-sand-200 bg-white animate-fade-up">
         <div className="relative bg-brand-900 text-white p-8 md:p-10 overflow-hidden">
+          {state.masjid.photo && <img src={state.masjid.photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
           <div className="absolute inset-0 pattern-stars" />
           <div className="absolute -bottom-24 -left-16 w-80 h-80 rounded-full bg-brand-500/40 blur-3xl" />
           <div className="absolute -top-20 right-0 w-64 h-64 rounded-full bg-gold-400/25 blur-3xl" />
           <div className="relative flex flex-col h-full">
-            <Logo size={52} />
+            <Logo size={52} src={state.masjid.logo} />
             <h1 className="font-display text-3xl md:text-4xl font-semibold mt-8 leading-tight">Welcome home.</h1>
             <p className="text-brand-100 mt-3 leading-relaxed">Log in to {state.masjid.name} to see your family's details, apply for services and stay close to your community.</p>
             <div className="mt-auto pt-10 text-sm text-brand-200 italic font-display">“Hold firmly to the rope of Allah all together.”</div>

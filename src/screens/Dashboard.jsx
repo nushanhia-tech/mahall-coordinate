@@ -7,6 +7,7 @@ import DonateSection from '../components/Donate';
 import EventCalendar from '../components/EventCalendar';
 import { inr, fmtDate } from '../utils/format';
 import { monthlySeries } from '../utils/finance';
+import { featureOn } from '../utils/features';
 import { navigate } from '../router';
 
 export const MapEmbed = ({ lat, lng, className = 'h-64' }) => {
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const s = useStats();
   const series = monthlySeries(state.transactions, 6);
   const m = state.masjid;
+  const on = (k) => featureOn(state.config, k);
   const today = new Date().toISOString().slice(0, 10);
   const nextEvent = [...state.events].filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0];
 
@@ -46,19 +48,21 @@ export default function Dashboard() {
     <div>
       {/* Hero: warm greeting with soft glowing shapes */}
       <section className="relative overflow-hidden bg-brand-900 text-white">
+        {m.photo && <><img src={m.photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-35" /><div className="absolute inset-0 bg-gradient-to-r from-brand-950 via-brand-900/85 to-brand-900/40" /></>}
         <div className="absolute inset-0 pattern-stars" />
         <div className="absolute -top-24 -left-24 w-[28rem] h-[28rem] rounded-full bg-brand-500/40 blur-3xl animate-float" />
         <div className="absolute -bottom-32 right-0 w-[30rem] h-[30rem] rounded-full bg-gold-400/25 blur-3xl animate-float" style={{ animationDelay: '-7s' }} />
         <div className="relative max-w-7xl mx-auto px-4 pt-14 pb-28 md:pt-20 md:pb-36 grid lg:grid-cols-5 gap-10 items-center">
           <div className="lg:col-span-3 animate-fade-up">
+            {m.logo && <img src={m.logo} alt="" className="w-16 h-16 rounded-3xl object-cover bg-white mb-5 shadow-lift ring-4 ring-white/10" />}
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-3 py-1.5 text-xs font-semibold text-gold-200 backdrop-blur">
               <Sparkles size={13} /> {greeting()}{user ? `, ${user.name.split(' ')[0]}` : ''} · Assalamu alaikum
             </div>
             <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-semibold leading-[1.05] mt-5">{m.name}</h1>
             <p className="mt-5 text-lg text-brand-100/90 max-w-xl leading-relaxed">{m.tagline ? `${m.tagline}. ` : ''}{m.about}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#donate" className="btn-gold"><Heart size={16} /> Give to the masjid</a>
-              <button onClick={openQuickFind} className="btn bg-white/10 hover:bg-white/15 text-white border border-white/20 backdrop-blur"><Sparkles size={16} className="text-gold-300" /> What are you looking for?</button>
+              {on('homeDonate') && <a href="#donate" className="btn-gold"><Heart size={16} /> Give to the masjid</a>}
+              {on('quickFind') && <button onClick={openQuickFind} className="btn bg-white/10 hover:bg-white/15 text-white border border-white/20 backdrop-blur"><Sparkles size={16} className="text-gold-300" /> What are you looking for?</button>}
             </div>
           </div>
           <div className="lg:col-span-2 animate-fade-up" style={{ animationDelay: '120ms' }}>
@@ -88,7 +92,7 @@ export default function Dashboard() {
           <StatCard icon={GraduationCap} label="Students learning" value={s.students} color="purple" />
         </div>
 
-        <section>
+        {on('homeFinance') && <section>
           <div className="eyebrow mb-2">Open books</div>
           <SectionTitle icon={Wallet} title="Where every rupee goes" subtitle="Our accounts are open to everyone. Every donation received and every rupee spent shows up here, live." />
           <div className="grid lg:grid-cols-3 gap-4">
@@ -119,36 +123,36 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
           </div>
-        </section>
+        </section>}
 
-        <DonateSection />
+        {on('homeDonate') && <DonateSection />}
 
-        <section>
+        {(on('rental') || on('chitty') || on('auction')) && <section>
           <div className="eyebrow mb-2">Here to help</div>
           <SectionTitle icon={ShoppingCart} title="Community services" subtitle="Borrow what you need, save together, and support the masjid – all from your phone." />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <QuickCard icon={ShoppingCart} title="Rental cart" text="Chairs, tents, sound system and more – by the hour, day, week or month." to="/services/rental" tone="sky" />
-            <QuickCard icon={Coins} title="Chitty money" text="Save a little every month with neighbours you trust. Pay by UPI." to="/services/chitty" tone="gold" delay={60} />
-            <QuickCard icon={Gavel} title="Live auction (Lelam)" text="Bid on Nercha offerings and watch the bids come in live." to="/services/auction" tone="violet" delay={120} />
+            {on('rental') && <QuickCard icon={ShoppingCart} title="Rental cart" text="Chairs, tents, sound system and more – by the hour, day, week or month." to="/services/rental" tone="sky" />}
+            {on('chitty') && <QuickCard icon={Coins} title="Chitty money" text="Save a little every month with neighbours you trust. Pay by UPI." to="/services/chitty" tone="gold" delay={60} />}
+            {on('auction') && <QuickCard icon={Gavel} title="Live auction (Lelam)" text="Bid on Nercha offerings and watch the bids come in live." to="/services/auction" tone="violet" delay={120} />}
           </div>
-        </section>
+        </section>}
 
-        <section>
+        {(on('nikkah') || on('homeApplication') || on('mediation')) && <section>
           <div className="eyebrow mb-2">Life moments</div>
           <SectionTitle icon={FileHeart} title="Apply online" subtitle="No queues, no paperwork lost. Apply from home and follow your request until it is done." />
           <div className="grid sm:grid-cols-3 gap-4">
-            <QuickCard icon={FileHeart} title="Nikkah" text="Apply for Nikkah registration and get your certificate." to="/apply/nikkah" tone="rose" />
-            <QuickCard icon={HomeIcon} title="A new home number" text="Moved into a new house? Register your family with the Mahall." to="/apply/home" tone="brand" delay={60} />
-            <QuickCard icon={MessageCircle} title="Talk to the committee" text="A private, respectful space to raise a concern or ask for help." to="/mediation" tone="clay" delay={120} />
+            {on('nikkah') && <QuickCard icon={FileHeart} title="Nikkah" text="Apply for Nikkah registration and get your certificate." to="/apply/nikkah" tone="rose" />}
+            {on('homeApplication') && <QuickCard icon={HomeIcon} title="A new home number" text="Moved into a new house? Register your family with the Mahall." to="/apply/home" tone="brand" delay={60} />}
+            {on('mediation') && <QuickCard icon={MessageCircle} title="Ask or raise a concern" text="Send a problem or a question privately – to the Khateeb, the committee, or both." to="/mediation" tone="clay" delay={120} />}
           </div>
-        </section>
+        </section>}
 
-        <section>
+        {on('homeEvents') && <section>
           <SectionTitle icon={CalendarDays} title="What's happening" subtitle="Programmes, meetings and gatherings. Tap a day to see its events." />
           <EventCalendar events={state.events} />
-        </section>
+        </section>}
 
-        <section>
+        {on('homeAchievements') && <section>
           <SectionTitle icon={Trophy} title="Moments we're proud of" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...state.achievements].sort((a, b) => b.date.localeCompare(a.date)).map((a) => (
@@ -162,9 +166,9 @@ export default function Dashboard() {
             ))}
             {!state.achievements.length && <div className="card sm:col-span-3"><Empty>Our first milestone is on its way.</Empty></div>}
           </div>
-        </section>
+        </section>}
 
-        <section>
+        {on('homeInstitutions') && <section>
           <div className="flex items-end justify-between gap-3">
             <SectionTitle icon={BookOpen} title="Learning together" subtitle="Our madrasas, colleges and skill centres." />
             <button className="btn-outline btn-sm mb-4 shrink-0" onClick={() => navigate('/courses')}>All courses <ArrowRight size={13} /></button>
@@ -183,10 +187,10 @@ export default function Dashboard() {
             ))}
             {!state.institutions.length && <div className="card sm:col-span-3"><Empty>Institutions will appear here once added.</Empty></div>}
           </div>
-        </section>
+        </section>}
 
-        <section className="grid lg:grid-cols-2 gap-8">
-          <div>
+        {(on('homeOpportunities') || on('homeServices')) && <section className="grid lg:grid-cols-2 gap-8">
+          {on('homeOpportunities') && <div>
             <div className="flex items-end justify-between gap-3"><SectionTitle icon={Briefcase} title="Opportunities" /><button className="btn-outline btn-sm mb-4" onClick={() => navigate('/opportunities')}>See all <ArrowRight size={13} /></button></div>
             <div className="space-y-3">
               {state.opportunities.slice(0, 4).map((o) => (
@@ -194,8 +198,8 @@ export default function Dashboard() {
               ))}
               {!state.opportunities.length && <div className="card"><Empty>No openings right now.</Empty></div>}
             </div>
-          </div>
-          <div>
+          </div>}
+          {on('homeServices') && <div>
             <SectionTitle icon={LifeBuoy} title="Always here for you" />
             <div className="space-y-3">
               {state.services.map((sv) => (
@@ -203,13 +207,13 @@ export default function Dashboard() {
               ))}
               {!state.services.length && <div className="card"><Empty>Services will be listed here.</Empty></div>}
             </div>
-          </div>
-        </section>
+          </div>}
+        </section>}
 
         <section id="contacts">
           <SectionTitle icon={MapPin} title="Come and visit" subtitle="Our doors are open. Here is how to reach us and who to talk to." />
           <div className="grid lg:grid-cols-3 gap-4">
-            <div className="card lg:col-span-2 !p-3">
+            {on('homeMap') && <div className="card lg:col-span-2 !p-3">
               <MapEmbed lat={m.lat} lng={m.lng} className="h-72 rounded-3xl border-0" />
               <div className="px-3 pt-4 pb-2 text-sm text-ink-600 flex flex-wrap gap-x-6 gap-y-2">
                 <span className="flex items-center gap-1.5"><MapPin size={14} className="text-brand-600" />{m.address}</span>
@@ -217,9 +221,9 @@ export default function Dashboard() {
                 {m.email && <a href={`mailto:${m.email}`} className="flex items-center gap-1.5"><Mail size={14} className="text-brand-600" />{m.email}</a>}
                 <a className="text-brand-700 font-semibold" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`}>Get directions →</a>
               </div>
-            </div>
+            </div>}
             <div className="space-y-4">
-              <div className="card">
+              {on('homeCommittee') && <div className="card">
                 <div className="font-display text-lg font-semibold mb-3">Our committee</div>
                 {state.committee.map((c) => (
                   <div key={c.id} className="flex items-center gap-3 py-2">
@@ -229,12 +233,12 @@ export default function Dashboard() {
                   </div>
                 ))}
                 {!state.committee.length && <div className="text-sm text-ink-400">Committee members will be listed here.</div>}
-              </div>
-              <div className="card bg-gradient-to-br from-clay-50 to-white">
+              </div>}
+              {on('homeHelpdesk') && <div className="card bg-gradient-to-br from-clay-50 to-white">
                 <div className="font-display text-lg font-semibold mb-3 flex items-center gap-2"><Phone size={16} className="text-clay-500" />In an emergency</div>
                 {state.helpdesk.map((h) => <div key={h.id} className="flex justify-between gap-2 py-1.5 text-sm"><span><b className="text-ink-800">{h.name}</b> <span className="text-xs text-ink-500">· {h.service}</span></span><a href={`tel:${h.phone}`} className="font-bold text-clay-600 whitespace-nowrap">{h.phone}</a></div>)}
                 {!state.helpdesk.length && <div className="text-sm text-ink-400">Emergency numbers will be listed here.</div>}
-              </div>
+              </div>}
             </div>
           </div>
         </section>

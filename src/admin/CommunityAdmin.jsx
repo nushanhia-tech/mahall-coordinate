@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { useApp } from '../store/AppContext';
+import { InstitutionReportsAdmin } from '../modules/InstitutionReports';
 import { CrudManager, Tabs, StatusBadge, Empty } from '../components/ui';
 import { fmtDate, fmtDateTime, inr } from '../utils/format';
 
@@ -58,7 +59,8 @@ export default function CommunityAdmin() {
   });
   return (
     <div>
-      <Tabs active={tab} onChange={setTab} tabs={[{ id: 'institutions', label: 'Institutions' }, { id: 'courses', label: 'Courses' }, { id: 'apps', label: 'Course applications', count: state.courseApplications.filter((a) => a.status === 'pending').length }, { id: 'opps', label: 'Opportunities' }, { id: 'services', label: 'Services' }]} />
+      <Tabs active={tab} onChange={setTab} tabs={[{ id: 'institutions', label: 'Institutions' }, { id: 'courses', label: 'Courses' }, { id: 'apps', label: 'Course applications', count: state.courseApplications.filter((a) => a.status === 'pending').length }, { id: 'opps', label: 'Opportunities' }, { id: 'services', label: 'Services' }, { id: 'reports', label: 'Financial reports', count: state.institutionReports.filter((r) => r.status === 'submitted').length }]} />
+      {tab === 'reports' && <InstitutionReportsAdmin />}
       {tab === 'institutions' && <CrudManager title="Institutions" items={state.institutions} fields={institutionFields} {...crud('institutions', 'Institution')} canDelete={(i) => !state.users.some((u) => u.institutionId === i.id)} />}
       {tab === 'courses' && <CrudManager title="Courses" items={state.courses} fields={courseFields(state)} {...crud('courses', 'Course')} />}
       {tab === 'apps' && <CourseApplications />}

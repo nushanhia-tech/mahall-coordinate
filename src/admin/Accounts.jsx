@@ -19,6 +19,7 @@ function Ledger() {
     e.preventDefault();
     const d = { ...form, amount: Number(form.amount) };
     if (d.amount <= 0) return toast('Amount must be more than zero', 'error');
+    if (d.docNo && state.transactions.some((t) => t.docNo === d.docNo && t.id !== d.id)) return toast(`Number ${d.docNo} is already used – leave it empty to auto-number`, 'error');
     if (d.id) { patch('transactions', d.id, d); toast('Entry updated'); } else { add('transactions', d); toast(`${d.type === 'income' ? 'Income' : 'Expense'} recorded`); }
     setForm(null);
   };
@@ -37,11 +38,12 @@ function Ledger() {
       </div>
       <div className="overflow-x-auto">
         <table className="table">
-          <thead><tr><th>Date</th><th>Type</th><th>Account</th><th>Description</th><th className="text-right">Amount</th><th className="text-right">Running balance</th><th>Bill</th><th /></tr></thead>
+          <thead><tr><th>Date</th><th>Receipt / Voucher</th><th>Type</th><th>Account</th><th>Description</th><th className="text-right">Amount</th><th className="text-right">Running balance</th><th>Bill</th><th /></tr></thead>
           <tbody>
             {rows.map((t) => (
               <tr key={t.id}>
                 <td className="whitespace-nowrap">{fmtDate(t.date)}</td>
+                <td className="whitespace-nowrap font-mono text-xs font-semibold text-ink-600">{t.docNo || <span className="text-ink-400 font-sans font-normal">numbering…</span>}</td>
                 <td><StatusBadge status={t.type} /></td>
                 <td>{t.head}</td>
                 <td>{t.description}</td>
@@ -62,6 +64,10 @@ function Ledger() {
         {form && (
           <form onSubmit={save} className="grid grid-cols-2 gap-3">
             <Field label="Type"><select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="income">Income</option><option value="expense">Expense</option></select></Field>
+            <Field label={form.type === 'income' ? 'Receipt number' : 'Voucher number'} className="col-span-2">
+              <input className="input font-mono" placeholder={`Leave empty to auto-number (${form.type === 'income' ? 'R' : 'V'}-${(form.date || '').slice(0, 4)}-0001…)`} value={form.docNo || ''} onChange={(e) => setForm({ ...form, docNo: e.target.value.toUpperCase() })} />
+              <span className="text-[11px] text-ink-400">Every income gets a receipt number and every expense a voucher number. Numbers must be unique.</span>
+            </Field>
             <Field label="Date *"><input type="date" className="input" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
             <Field label="Account head *"><select className="input" value={form.head} onChange={(e) => setForm({ ...form, head: e.target.value })}>{state.accountHeads.map((h) => <option key={h}>{h}</option>)}</select></Field>
             <Field label="Amount (₹) *"><input type="number" min="1" step="0.01" className="input" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field>
@@ -149,7 +155,7 @@ function Reports() {
     blocks: [
       { kv: [['Opening balance', pdfInr(r.opening)], ['Total income', pdfInr(r.income)], ['Total expense', pdfInr(r.expense)], ['Closing balance', pdfInr(r.closing)]] },
       { heading: 'Transactions' },
-      { table: { head: ['Date', 'Account', 'Description', 'Income', 'Expense', 'Balance'], body: [['', '', 'Opening balance', '', '', pdfInr(r.opening)], ...r.rows.map((t) => [fmtDate(t.date), t.head, t.description, t.type === 'income' ? pdfInr(t.amount) : '', t.type === 'expense' ? pdfInr(t.amount) : '', pdfInr(t.balance)])], foot: [['', '', 'Closing balance', pdfInr(r.income), pdfInr(r.expense), pdfInr(r.closing)]] } },
+      { table: { head: ['Date', 'Rcpt / Vchr No', 'Account', 'Description', 'Income', 'Expense', 'Balance'], body: [['', '', '', 'Opening balance', '', '', pdfInr(r.opening)], ...r.rows.map((t) => [fmtDate(t.date), t.docNo || '', t.head, t.description, t.type === 'income' ? pdfInr(t.amount) : '', t.type === 'expense' ? pdfInr(t.amount) : '', pdfInr(t.balance)])], foot: [['', '', '', 'Closing balance', pdfInr(r.income), pdfInr(r.expense), pdfInr(r.closing)]] } },
       { heading: 'Account summary' },
       { table: { head: ['Account', 'Income', 'Expense', 'Net'], body: r.summary.map((s) => [s.head, pdfInr(s.income), pdfInr(s.expense), pdfInr(s.income - s.expense)]) } },
     ],
@@ -170,11 +176,11 @@ function Reports() {
           {[['Opening', r.opening], ['Income', r.income], ['Expense', r.expense], ['Closing', r.closing]].map(([l, v]) => <div key={l} className="bg-slate-50 rounded-lg p-3"><div className="text-xs text-slate-500">{l}</div><div className="font-bold text-lg">{inr(v)}</div></div>)}
         </div>
         <table className="table">
-          <thead><tr><th>Date</th><th>Account</th><th>Description</th><th className="text-right">Income</th><th className="text-right">Expense</th><th className="text-right">Balance</th></tr></thead>
+          <thead><tr><th>Date</th><th>No.</th><th>Account</th><th>Description</th><th className="text-right">Income</th><th className="text-right">Expense</th><th className="text-right">Balance</th></tr></thead>
           <tbody>
-            <tr className="bg-slate-50 italic"><td colSpan={5}>Opening balance</td><td className="text-right">{inr(r.opening)}</td></tr>
-            {r.rows.map((t) => <tr key={t.id}><td>{fmtDate(t.date)}</td><td>{t.head}</td><td>{t.description}</td><td className="text-right text-green-700">{t.type === 'income' ? inr(t.amount) : ''}</td><td className="text-right text-red-600">{t.type === 'expense' ? inr(t.amount) : ''}</td><td className="text-right font-mono">{inr(t.balance)}</td></tr>)}
-            <tr className="bg-brand-50 font-bold"><td colSpan={3}>Closing balance</td><td className="text-right">{inr(r.income)}</td><td className="text-right">{inr(r.expense)}</td><td className="text-right">{inr(r.closing)}</td></tr>
+            <tr className="bg-sand-50 italic"><td colSpan={6}>Opening balance</td><td className="text-right">{inr(r.opening)}</td></tr>
+            {r.rows.map((t) => <tr key={t.id}><td>{fmtDate(t.date)}</td><td className="font-mono text-xs">{t.docNo}</td><td>{t.head}</td><td>{t.description}</td><td className="text-right text-green-700">{t.type === 'income' ? inr(t.amount) : ''}</td><td className="text-right text-red-600">{t.type === 'expense' ? inr(t.amount) : ''}</td><td className="text-right font-mono">{inr(t.balance)}</td></tr>)}
+            <tr className="bg-brand-50 font-bold"><td colSpan={4}>Closing balance</td><td className="text-right">{inr(r.income)}</td><td className="text-right">{inr(r.expense)}</td><td className="text-right">{inr(r.closing)}</td></tr>
           </tbody>
         </table>
       </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Coins, LogOut, Check, X, FileDown, Banknote, Image as ImageIcon } from 'lucide-react';
-import { useApp } from '../store/AppContext';
+import { useApp, useFeature } from '../store/AppContext';
 import { CrudManager, Field, Modal, StatusBadge, Tabs, Empty, ImageInput, SectionTitle, StatCard, StoredImg } from '../components/ui';
 import { inr, pdfInr, fmtDateTime, monthLabel } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
@@ -21,6 +21,7 @@ const poolTotal = (state) => state.chittyPayments.filter((p) => p.status === 'co
 export default function ChittyPage() {
   const { state, add, toast, chittyMemberId: memberId, chittyLogin, chittyLogout } = useApp();
   const isDemo = useMasjidSlug() === 'juma-masjid';
+  const upiOn = useFeature('chittyUpi');
   const [cred, setCred] = useState({ code: '', password: '' });
   const [pay, setPay] = useState(null);
   const c = state.chitty;
@@ -77,7 +78,7 @@ export default function ChittyPage() {
                 <div className="text-xs text-slate-500">Month {m}</div>
                 <div className="font-semibold">{monthLabel(c.startMonth, m - 1)}</div>
                 <div className="text-xs capitalize mt-1">{st === 'paid' ? `Paid · ${p.method}` : st}{p?.status === 'rejected' && st !== 'pending' ? ' (last attempt rejected)' : ''}</div>
-                {(st === 'due' || st === 'upcoming') && <button className="btn-primary btn-sm mt-2 w-full" onClick={() => setPay({ month: m, screenshot: '', utr: '' })}>Pay {inr(c.monthlyAmount)}</button>}
+                {(st === 'due' || st === 'upcoming') && upiOn && <button className="btn-primary btn-sm mt-2 w-full" onClick={() => setPay({ month: m, screenshot: '', utr: '' })}>Pay {inr(c.monthlyAmount)}</button>}
               </div>
             );
           })}

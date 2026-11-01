@@ -27,12 +27,12 @@ export function Field({ label, children, className = '' }) {
   );
 }
 
-export function ImageInput({ value, onChange, label = 'Upload image', accept = 'image/*' }) {
+export function ImageInput({ value, onChange, label = 'Upload image', accept = 'image/*', maxSize = 900 }) {
   return (
     <div className="flex items-center gap-3">
       <label className="btn-outline cursor-pointer">
         <Upload size={14} /> {label}
-        <input type="file" accept={accept} className="hidden" onChange={async (e) => onChange(await readImage(e.target.files[0]))} />
+        <input type="file" accept={accept} className="hidden" onChange={async (e) => onChange(await readImage(e.target.files[0], maxSize))} />
       </label>
       {value && (value.startsWith('data:image') ? <img src={value} alt="" className="h-12 w-12 object-cover rounded border" /> : <span className="text-xs text-brand-700">File attached</span>)}
       {value && <button type="button" className="text-xs text-red-600" onClick={() => onChange('')}>Remove</button>}
@@ -137,7 +137,7 @@ export function CrudManager({ title, items, fields, onAdd, onUpdate, onDelete, d
       <Modal open={!!editing} onClose={() => setEditing(null)} title={`${editing?.id ? 'Edit' : 'Add'} ${title.replace(/s$/, '')}`}>
         {editing && (
           <form onSubmit={save} className="grid grid-cols-2 gap-3">
-            {fields.filter((f) => f.form !== false).map((f) => (
+            {fields.filter((f) => f.form !== false && (!f.show || f.show(editing))).map((f) => (
               <Field key={f.name} label={f.label + (f.required ? ' *' : '')} className={f.type === 'textarea' || f.type === 'image' || f.full ? 'col-span-2' : ''}>
                 {f.type === 'textarea' ? (
                   <textarea className="input" rows={3} required={f.required} value={editing[f.name] ?? ''} onChange={(e) => setEditing({ ...editing, [f.name]: e.target.value })} />
@@ -191,7 +191,7 @@ export const usePhoneLookup = (kind, phone) => {
 
 // Shows an uploaded image that may be stored on the server (value === '__stored__');
 // it is fetched only when this is on screen.
-export function StoredImg({ col, id, field, value, className = '' }) {
+export function StoredImg({ col, id, field, value, className = '', fileName = '' }) {
   const { api } = useApp();
   const stored = value === '__stored__';
   const [src, setSrc] = useState(stored ? '' : value);
@@ -208,7 +208,15 @@ export function StoredImg({ col, id, field, value, className = '' }) {
   if (failed) return <div className="text-sm text-red-600 text-center py-6">Could not load the image.</div>;
   if (!src) return <div className="text-sm text-slate-400 text-center py-6">Loading image…</div>;
   if (!src.startsWith('data:image')) {
-    return <button className="btn-primary" onClick={() => fetch(src).then((r) => r.blob()).then((b) => import('../utils/download').then((m) => m.saveFile('bill.pdf', b)))}>Download file</button>;
+    const mime = (src.match(/^data:([^;,]+)/) || [])[1] || '';
+    const ext = { 'application/pdf': 'pdf', 'text/csv': 'csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx', 'application/vnd.ms-excel': 'xls', 'application/msword': 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx' }[mime] || 'pdf';
+    const name = fileName || `${field}-${id}.${ext}`;
+    return (
+      <div className="inline-flex flex-col items-center gap-2 rounded-2xl border border-sand-200 p-6">
+        <div className="text-sm font-semibold">{name}</div>
+        <button className="btn-primary" onClick={() => fetch(src).then((r) => r.blob()).then((b) => import('../utils/download').then((m) => m.saveFile(name, b)))}>Download file</button>
+      </div>
+    );
   }
   return <img src={src} alt="" className={className} />;
 }

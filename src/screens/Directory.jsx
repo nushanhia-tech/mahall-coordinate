@@ -45,7 +45,7 @@ export default function Directory() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {shown.map((m, idx) => (
             <a key={m.slug} href={`/${m.slug}`} className="card card-hover block group animate-fade-up" style={{ animationDelay: `${idx * 50}ms` }}>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-100 to-gold-100 grid place-items-center text-2xl mb-4">🕌</div>
+              {m.logo ? <img src={m.logo} alt="" className="w-12 h-12 rounded-2xl object-cover ring-1 ring-sand-200 mb-4" /> : <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-100 to-gold-100 grid place-items-center text-2xl mb-4">🕌</div>}
               <div className="font-display text-xl font-semibold text-ink-900">{m.name}</div>
               {m.address && <div className="text-xs text-ink-500 flex items-start gap-1.5 mt-2"><MapPin size={12} className="mt-0.5 shrink-0" />{m.address}</div>}
               <div className="text-xs text-ink-500 flex items-center gap-1.5 mt-1.5"><Home size={12} />{m.homes} families</div>

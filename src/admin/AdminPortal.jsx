@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { LayoutDashboard, Home, Wallet, HeartHandshake, CalendarDays, Users, MapPin, ShoppingCart, Coins, Gavel, MessageCircle, FileHeart, HomeIcon, GraduationCap, Settings } from 'lucide-react';
+import { LayoutDashboard, Home, Wallet, HeartHandshake, CalendarDays, Users, MapPin, ShoppingCart, Coins, Gavel, MessageCircle, FileHeart, HomeIcon, GraduationCap, Settings, HandCoins, ToggleRight, FileText } from 'lucide-react';
+import FeaturesAdmin from './FeaturesAdmin';
+import { VariAdmin } from '../modules/Vari';
+import { InstitutionReportsAdmin } from '../modules/InstitutionReports';
 import { useApp, useStats } from '../store/AppContext';
 import { navigate } from '../router';
 import { StatCard } from '../components/ui';
@@ -30,6 +33,8 @@ function Overview() {
     chats: state.chats.reduce((a, c) => a + c.messages.filter((m) => m.from === 'member' && !m.read).length, 0),
     rentals: state.rentals.filter((r) => r.status === 'active' && new Date(r.due) < new Date()).length,
     courses: state.courseApplications.filter((p) => p.status === 'pending').length,
+    vari: state.variPayments.filter((p) => p.status === 'pending').length,
+    reports: state.institutionReports.filter((r) => r.status === 'submitted').length,
   };
   const tasks = [
     ['donations', 'Donations awaiting verification', pend.donations],
@@ -39,6 +44,8 @@ function Overview() {
     ['mediation', 'Unread mediation messages', pend.chats],
     ['rental', 'Overdue rentals', pend.rentals],
     ['community', 'Course applications', pend.courses],
+    ['vari', 'Monthly Vari payments to confirm', pend.vari],
+    ['reports', 'Institution reports to review', pend.reports],
   ];
   const recent = [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   return (
@@ -129,6 +136,9 @@ export const ADMIN_TABS = [
   ['nikkah', 'Nikkah Applications', FileHeart, NikkahAdmin],
   ['homeapps', 'New Home Applications', HomeIcon, HomeAppsAdmin],
   ['community', 'Courses & Opportunities', GraduationCap, CommunityAdmin],
+  ['vari', 'Monthly Vari', HandCoins, VariAdmin],
+  ['reports', 'Institution reports', FileText, InstitutionReportsAdmin],
+  ['features', 'Features & visibility', ToggleRight, FeaturesAdmin],
   ['settings', 'Data & Settings', Settings, SettingsTab],
 ];
 
@@ -136,10 +146,10 @@ export const ADMIN_TABS = [
 const GROUPS = [
   ['Today', ['overview']],
   ['People', ['households', 'users', 'homeapps', 'nikkah', 'mediation']],
-  ['Money', ['accounts', 'donations', 'chitty']],
+  ['Money', ['accounts', 'donations', 'vari', 'chitty', 'reports']],
   ['Services', ['rental', 'auction']],
   ['Community', ['events', 'community', 'location']],
-  ['System', ['settings']],
+  ['System', ['features', 'settings']],
 ];
 const INTRO = {
   overview: 'A calm look at what needs you today.',
@@ -157,6 +167,9 @@ const INTRO = {
   homeapps: 'Approve new families – a household record is created for you.',
   community: 'Institutions, courses, opportunities and services.',
   settings: 'Backups, restore, and starting fresh.',
+  vari: 'Each home\'s monthly contribution. Set rates, record cash, confirm UPI payments and print receipts.',
+  reports: 'Financial reports sent by your institutions from their portal.',
+  features: 'Switch every member-facing option on or off to match your Mahall\'s rules.',
 };
 
 export default function AdminPortal({ tab }) {
@@ -171,6 +184,8 @@ export default function AdminPortal({ tab }) {
     homeapps: state.homeApps.filter((p) => p.status === 'pending').length,
     mediation: state.chats.reduce((a, c) => a + c.messages.filter((m) => m.from === 'member' && !m.read).length, 0),
     community: state.courseApplications.filter((p) => p.status === 'pending').length,
+    vari: state.variPayments.filter((p) => p.status === 'pending').length,
+    reports: state.institutionReports.filter((r) => r.status === 'submitted').length,
   };
   const Item = ({ id }) => {
     const [, label, Icon] = byId[id];

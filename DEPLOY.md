@@ -2,7 +2,7 @@
 
 ## 1. Supabase (database)
 1. Create a project at https://supabase.com (choose the Mumbai region for India).
-2. **SQL Editor → New query**: paste `supabase/migrations/0001_init.sql` and run it; then do the same with `supabase/migrations/0002_multi_masjid.sql`.
+2. **SQL Editor → New query**: paste `supabase/migrations/0001_init.sql` and run it; then do the same with `supabase/migrations/0002_multi_masjid.sql` and `supabase/migrations/0003_upgrade_pack.sql`.
    (Or locally: put the connection string in `.env.local` and run `npm run db:migrate`.)
 3. Check **Table Editor**: you should see 31 tables (households, transactions, donations, rentals, …).
 4. Collect these values:
@@ -38,3 +38,6 @@ Every `git push` to `main` now redeploys automatically; pushes to other branches
 ## Updating an existing site to many-masjid support
 Run `supabase/migrations/0002_multi_masjid.sql` once in Supabase → SQL Editor. Existing data becomes the masjid at `/juma-masjid`.
 Then log in at `/super` (superadmin / super123), change that password, and add more masjids.
+
+## Updating to the upgrade pack
+Run `supabase/migrations/0003_upgrade_pack.sql` once in Supabase → SQL Editor (safe to re-run). Existing ledger entries get receipt / voucher numbers automatically.

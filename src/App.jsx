@@ -3,6 +3,7 @@ import { useApp } from './store/AppContext';
 import { useRoute, navigate } from './router';
 import Navbar, { Logo } from './components/Navbar';
 import QuickFind from './components/QuickFind';
+import { featureOn } from './utils/features';
 import Dashboard from './screens/Dashboard';
 import Login from './screens/Login';
 import AdminPortal from './admin/AdminPortal';
@@ -29,6 +30,20 @@ function RequireLogin({ roles, children }) {
   );
 }
 
+// A page whose feature the admin switched off shows a gentle note instead (admins still get in).
+function FeatureGate({ k, title, children }) {
+  const { state, user } = useApp();
+  if (user?.role === 'admin' || featureOn(state.config, k)) return children;
+  return (
+    <div className="max-w-md mx-auto my-20 card text-center p-8">
+      <div className="text-3xl">🌙</div>
+      <h2 className="font-display text-2xl font-semibold mt-2">{title} is not available</h2>
+      <p className="text-sm text-ink-500 mt-2">The Mahall committee has turned this service off for now.</p>
+      <button className="btn-primary mt-5" onClick={() => navigate('/')}>Back to home</button>
+    </div>
+  );
+}
+
 const routes = [
   ['/', () => <Dashboard />],
   ['/login', () => <Login />],
@@ -37,13 +52,13 @@ const routes = [
   ['/khateeb', () => <RequireLogin roles={['khateeb']}><KhateebPortal /></RequireLogin>],
   ['/institution', () => <RequireLogin roles={['institution']}><InstitutionPortal /></RequireLogin>],
   ['/services/rental', () => <RentalPage />],
-  ['/services/chitty', () => <ChittyPage />],
-  ['/services/auction', () => <AuctionPage />],
+  ['/services/chitty', () => <FeatureGate k="chitty" title="Chitty"><ChittyPage /></FeatureGate>],
+  ['/services/auction', () => <FeatureGate k="auction" title="The auction"><AuctionPage /></FeatureGate>],
   ['/apply/nikkah', () => <RequireLogin><NikkahPage /></RequireLogin>],
   ['/apply/home', () => <RequireLogin><HomeApplyPage /></RequireLogin>],
   ['/mediation', () => <RequireLogin roles={['individual', 'khateeb', 'institution']}><MediationPage /></RequireLogin>],
   ['/courses', () => <CoursesPage />],
-  ['/opportunities', () => <OpportunitiesPage />],
+  ['/opportunities', () => <FeatureGate k="opportunitiesPage" title="Opportunities"><OpportunitiesPage /></FeatureGate>],
 ];
 
 export default function App() {
@@ -68,7 +83,7 @@ export default function App() {
         <div className="absolute inset-0 pattern-stars opacity-60" />
         <div className="relative max-w-7xl mx-auto px-4 py-10 grid gap-6 md:grid-cols-3 items-start">
           <div className="flex items-center gap-3">
-            <Logo size={44} />
+            <Logo size={44} src={state.masjid.logo} />
             <div>
               <div className="font-display text-lg text-white">{state.masjid.name}</div>
               <div className="text-xs text-brand-200">{state.masjid.address}</div>

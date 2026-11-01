@@ -94,7 +94,7 @@ export const seed = () => ({
   users: [
     { id: 'u1', username: 'admin', password: 'admin123', role: 'admin', name: 'Mahall Admin', householdId: '', institutionId: '' },
     { id: 'u2', username: 'member', password: 'member123', role: 'individual', name: 'Abdul Rahman K', householdId: 'h1', institutionId: '' },
-    { id: 'u3', username: 'khateeb', password: 'khateeb123', role: 'khateeb', name: 'Usthad Hamza Faizy', householdId: '', institutionId: '' },
+    { id: 'u3', username: 'khateeb', password: 'khateeb123', role: 'khateeb', name: 'Usthad Hamza Faizy', householdId: '', institutionId: '', education: 'B.A. Arabic, Calicut University', qualification: 'Faizy (Jamia Nooriya Arabic College)', graduation: 'Jamia Nooriya, Pattikkad – 2008' },
     { id: 'u4', username: 'madrasa', password: 'inst123', role: 'institution', name: 'Darul Huda Madrasa', householdId: '', institutionId: 'i1' },
   ],
   rentalItems: [
@@ -125,7 +125,7 @@ export const seed = () => ({
     { id: 'au2', name: 'Bunch of Bananas (Nendran)', description: 'Harvest offering for the masjid.', image: '', minBid: 200, increment: 20, endsAt: iso(26 * HOUR), status: 'live', bids: [] },
   ],
   chats: [
-    { id: 'ch1', userId: 'u2', subject: 'Boundary wall dispute with neighbour', householdInfo: 'MH-001 · Abdul Rahman K · 5 members · Ward 1', createdAt: iso(-26 * HOUR), messages: [
+    { id: 'ch1', userId: 'u2', kind: 'complaint', recipients: 'committee', subject: 'Boundary wall dispute with neighbour', householdInfo: 'MH-001 · Abdul Rahman K · 5 members · Ward 1', createdAt: iso(-26 * HOUR), messages: [
       { id: 'msg1', from: 'member', text: 'Assalamu alaikum. I need the committee to mediate a boundary issue with my neighbour.', time: iso(-26 * HOUR), read: true },
       { id: 'msg2', from: 'admin', text: 'Wa alaikum salam. We can arrange a meeting this Friday after Jumu\'ah. Please share details.', time: iso(-25 * HOUR), read: true },
     ] },

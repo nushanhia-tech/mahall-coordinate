@@ -9,7 +9,7 @@
 export const COLLECTION_SPEC = {
   households: {
     table: 'households',
-    fields: ['homeNo', 'headName', 'members:int', 'phone', 'ward', 'address', 'lat:num', 'lng:num'],
+    fields: ['homeNo', 'headName', 'members:int', 'phone', 'ward', 'address', 'lat:num', 'lng:num', 'variRate:num'],
     children: { family: { table: 'household_members', fields: ['name', 'age:int', 'relation', 'gender'] } },
   },
   institutions: { table: 'institutions', fields: ['name', 'type', 'students:int', 'contact', 'photo', 'description'] },
@@ -17,18 +17,18 @@ export const COLLECTION_SPEC = {
   courseApplications: { table: 'course_applications', fields: ['courseId:fk', 'userId', 'name', 'phone', 'age:int', 'qualification', 'status', 'remark', 'date:ts'] },
   opportunities: { table: 'opportunities', fields: ['type', 'title', 'description', 'eligibility', 'deadline:date', 'contact'] },
   services: { table: 'services', fields: ['title', 'description', 'contact'] },
-  transactions: { table: 'transactions', fields: ['date:date', 'type', 'head', 'amount:num', 'description', 'receipt', 'ref'] },
+  transactions: { table: 'transactions', fields: ['date:date', 'type', 'head', 'amount:num', 'description', 'receipt', 'ref', 'docNo'] },
   donationChannels: { table: 'donation_channels', fields: ['name', 'accountHead', 'upi', 'qr', 'qrImage', 'bank.holder', 'bank.bank', 'bank.accNo', 'bank.ifsc'] },
   donations: { table: 'donations', fields: ['channelId:fk', 'name', 'phone', 'amount:num', 'note', 'screenshot', 'status', 'remark', 'date:ts', 'decidedAt:ts', 'transactionId', 'accountHead'] },
   events: { table: 'events', fields: ['title', 'date:date', 'time', 'venue', 'description', 'rescheduledFrom:date'] },
   achievements: { table: 'achievements', fields: ['title', 'date:date', 'description'] },
   committee: { table: 'committee_members', fields: ['name', 'role', 'phone'] },
   helpdesk: { table: 'helpdesk_contacts', fields: ['name', 'service', 'phone'] },
-  users: { table: 'users', fields: ['username', 'password', 'role', 'name', 'householdId:fk', 'institutionId:fk'] },
-  rentalItems: { table: 'rental_items', fields: ['name', 'description', 'image', 'stock:int', 'rates.hour:num', 'rates.day:num', 'rates.week:num', 'rates.month:num'] },
+  users: { table: 'users', fields: ['username', 'password', 'role', 'name', 'householdId:fk', 'institutionId:fk', 'education', 'qualification', 'graduation'] },
+  rentalItems: { table: 'rental_items', fields: ['name', 'description', 'image', 'stock:int', 'rates.hour:num', 'rates.day:num', 'rates.week:num', 'rates.month:num', 'advance:num'] },
   rentals: {
     table: 'rentals',
-    fields: ['name', 'phone', 'unit', 'duration:int', 'start:ts', 'due:ts', 'status', 'baseAmount:num', 'returnedAt:ts', 'remark', 'penalty:num', 'penaltyDetail', 'total:num'],
+    fields: ['name', 'phone', 'unit', 'duration:int', 'start:ts', 'due:ts', 'status', 'baseAmount:num', 'returnedAt:ts', 'remark', 'penalty:num', 'penaltyDetail', 'total:num', 'advanceAmount:num', 'advancePaid:bool', 'advanceMethod', 'advanceReceivedAt:ts'],
     children: { items: { table: 'rental_lines', fields: ['itemId:fk', 'qty:int'] } },
   },
   chittyMembers: { table: 'chitty_members', fields: ['code', 'name', 'phone', 'password'] },
@@ -40,31 +40,37 @@ export const COLLECTION_SPEC = {
   },
   chats: {
     table: 'chats',
-    fields: ['userId:fk', 'subject', 'householdInfo', 'closed:bool', 'createdAt:ts'],
+    fields: ['userId:fk', 'subject', 'householdInfo', 'closed:bool', 'createdAt:ts', 'kind', 'recipients'],
     children: { messages: { table: 'chat_messages', fields: ['id', 'from', 'text', 'time:ts', 'read:bool'] } },
   },
   nikkahApps: {
     table: 'nikkah_applications',
     fields: [
       'userId:fk',
-      ...['groom', 'bride'].flatMap((p) => [`${p}.name`, `${p}.father`, `${p}.dob:date`, `${p}.phone`, `${p}.address`, `${p}.mahall`, `${p}.occupation`]),
-      'date:date', 'venue', 'mahr', 'wali', 'witness1', 'witness2', 'notes', 'status', 'remark', 'createdAt:ts', 'decidedAt:ts', 'decidedBy',
+      ...['groom', 'bride'].flatMap((p) => [`${p}.name`, `${p}.father`, `${p}.mother`, `${p}.dob:date`, `${p}.phone`, `${p}.address`, `${p}.mahall`, `${p}.occupation`, `${p}.education`]),
+      'date:date', 'venue', 'mahr', 'wali', 'waliAddress', 'waliRelation', 'witness1', 'witness2', 'notes', 'status', 'remark', 'createdAt:ts', 'decidedAt:ts', 'decidedBy',
+      'feeAmount:num', 'feeReceipt', 'feeStatus', 'feeUtr',
     ],
+    children: { witnesses: { table: 'nikkah_witnesses', fields: ['name', 'address', 'phone', 'idType', 'idNumber', 'notes'] } },
   },
   homeApps: {
     table: 'home_applications',
-    fields: ['userId:fk', 'applicant', 'phone', 'currentAddress', 'newAddress', 'ward', 'lat', 'lng', 'reason', 'status', 'remark', 'homeNo', 'householdId:fk', 'createdAt:ts', 'decidedAt:ts'],
+    fields: ['userId:fk', 'applicant', 'phone', 'currentAddress', 'newAddress', 'ward', 'lat', 'lng', 'reason', 'status', 'remark', 'homeNo', 'householdId:fk', 'createdAt:ts', 'decidedAt:ts', 'gpsAccuracy:num', 'gpsCapturedAt:ts'],
     children: { family: { table: 'home_application_members', fields: ['name', 'age:int', 'relation', 'gender'] } },
   },
+  variPayments: { table: 'vari_payments', fields: ['householdId:fk', 'month', 'amount:num', 'method', 'screenshot', 'utr', 'note', 'status', 'remark', 'date:ts', 'decidedAt:ts', 'transactionId'] },
+  institutionReports: { table: 'institution_reports', fields: ['institutionId:fk', 'title', 'period', 'notes', 'file', 'fileName', 'status', 'remark', 'submittedAt:ts', 'reviewedAt:ts'] },
 };
 
 export const COLLECTIONS = Object.keys(COLLECTION_SPEC);
-export const SETTINGS = ['masjid', 'accountHeads', 'chitty'];
+export const SETTINGS = ['masjid', 'accountHeads', 'chitty', 'config'];
 
 // Single-row settings tables.
 export const SETTING_SPEC = {
-  masjid: { table: 'masjid_profile', fields: ['name', 'tagline', 'address', 'lat:num', 'lng:num', 'phone', 'email', 'about'] },
+  masjid: { table: 'masjid_profile', fields: ['name', 'tagline', 'address', 'lat:num', 'lng:num', 'phone', 'email', 'about', 'logo', 'photo'] },
   chitty: { table: 'chitty_settings', fields: ['name', 'monthlyAmount:num', 'months:int', 'startMonth', 'upi'] },
+  // free-form settings document: feature switches, fees, Vari rates (all kept in the jsonb `extra` column)
+  config: { table: 'masjid_config', fields: [] },
 };
 
 const snake = (s) => s.replace(/\./g, '_').replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());

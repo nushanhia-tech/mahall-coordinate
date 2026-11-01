@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 export const GET = handle(async () => {
   await ensureSeeded();
   const rows = await listMasjids();
-  return json({ masjids: rows.map((m) => ({ slug: m.slug, name: m.name, address: m.address, homes: m.homes })) });
+  return json({ masjids: rows.map((m) => ({ slug: m.slug, name: m.name, address: m.address, homes: m.homes, logo: m.logo })) });
 });

@@ -5,20 +5,22 @@ import { useApp } from '../store/AppContext';
 import { navigate } from '../router';
 import { portalPath } from './Navbar';
 import { fmtDate } from '../utils/format';
+import { featureOn } from '../utils/features';
 
 export const openQuickFind = () => window.dispatchEvent(new Event('open-quick-find'));
 
 const PAGES = [
   ['Home', '/', Home, 'dashboard start welcome'],
-  ['Donate', '/#donate', HeartHandshake, 'give zakat sadaqa upi qr bank relief nercha'],
-  ['Rental cart', '/services/rental', ShoppingCart, 'hire chairs tent sound booking'],
-  ['Chitty money', '/services/chitty', Coins, 'kuri savings monthly instalment'],
-  ['Live auction (Lelam)', '/services/auction', Gavel, 'bid lelam nercha'],
-  ['Nikkah application', '/apply/nikkah', FileHeart, 'marriage wedding certificate'],
-  ['New home number', '/apply/home', HomeIcon, 'register house family'],
-  ['Mediation chat', '/mediation', MessageCircle, 'complaint dispute talk committee message'],
+  ['Donate', '/#donate', HeartHandshake, 'give zakat sadaqa upi qr bank relief nercha receipt', 'homeDonate'],
+  ['Rental cart', '/services/rental', ShoppingCart, 'hire chairs tent sound booking advance', 'rental'],
+  ['Chitty money', '/services/chitty', Coins, 'kuri savings monthly instalment', 'chitty'],
+  ['Live auction (Lelam)', '/services/auction', Gavel, 'bid lelam nercha', 'auction'],
+  ['Nikkah application', '/apply/nikkah', FileHeart, 'marriage wedding certificate waliyy witness', 'nikkah'],
+  ['New home number', '/apply/home', HomeIcon, 'register house family gps', 'homeApplication'],
+  ['Enquiry & mediation', '/mediation', MessageCircle, 'complaint doubt query problem dispute talk committee khateeb message', 'mediation'],
   ['Courses & institutions', '/courses', BookOpen, 'madrasa class study admission'],
-  ['Opportunities', '/opportunities', Briefcase, 'job scholarship service'],
+  ['Opportunities', '/opportunities', Briefcase, 'job scholarship service', 'opportunitiesPage'],
+  ['My monthly Vari', '/portal', Coins, 'subscription monthly dues home payment', 'vari'],
 ];
 const ADMIN = [
   ['overview', 'Admin overview', LayoutDashboard, 'dashboard tasks'],
@@ -35,6 +37,9 @@ const ADMIN = [
   ['nikkah', 'Nikkah applications', FileHeart, 'approve'],
   ['homeapps', 'New home applications', HomeIcon, 'approve'],
   ['community', 'Courses & opportunities (admin)', GraduationCap, 'institutions'],
+  ['vari', 'Monthly Vari', Coins, 'subscription home monthly dues cash collection'],
+  ['reports', 'Institution reports', BookOpen, 'financial statement audit madrasa'],
+  ['features', 'Features & visibility', Settings, 'switch toggle hide show on off rules'],
   ['settings', 'Data & settings', Settings, 'backup erase restore'],
 ];
 
@@ -75,6 +80,8 @@ export default function QuickFind() {
         [n(state.homeApps, (a) => a.status === 'pending'), 'new home request{s} to review', '/admin/homeapps', HomeIcon],
         [state.chats.reduce((a, c) => a + c.messages.filter((m) => m.from === 'member' && !m.read).length, 0), 'unread mediation message{s}', '/admin/mediation', MessageCircle],
         [n(state.rentals, (r) => r.status === 'active' && new Date(r.due) < new Date()), 'overdue rental{s} to collect', '/admin/rental', ShoppingCart],
+        [n(state.variPayments, (p) => p.status === 'pending'), 'Vari payment{s} to confirm', '/admin/vari', Coins],
+        [n(state.institutionReports, (r) => r.status === 'submitted'), 'institution report{s} to review', '/admin/reports', BookOpen],
       ];
       for (const [count, text, to, icon] of items) if (count) out.push({ label: `${count} ${text.replace('{s}', count === 1 ? '' : 's')}`, to, icon, hint: 'Needs attention' });
       if (!out.length) out.push({ label: 'All caught up – nothing is waiting for you', to: '/admin', icon: Sparkles, hint: 'Overview' });
@@ -92,7 +99,7 @@ export default function QuickFind() {
     if (!words.length) return suggestions;
     const match = (text) => words.every((w) => text.toLowerCase().includes(w));
     const out = [];
-    for (const [label, to, icon, kw] of PAGES) if (match(`${label} ${kw}`)) out.push({ label, to, icon, hint: 'Page' });
+    for (const [label, to, icon, kw, key] of PAGES) if ((!key || featureOn(state.config, key)) && match(`${label} ${kw}`)) out.push({ label, to, icon, hint: 'Page' });
     if (isAdmin) for (const [id, label, icon, kw] of ADMIN) if (match(`${label} ${kw} admin`)) out.push({ label, to: `/admin/${id}`, icon, hint: 'Admin' });
     if (isAdmin) for (const h of state.households) if (match(`${h.homeNo} ${h.headName} ${h.phone} ${h.ward} ${h.address}`)) out.push({ label: `${h.homeNo} · ${h.headName}`, sub: `${h.members} members · ${h.ward || ''} ${h.phone ? `· ${h.phone}` : ''}`, to: '/admin/households', icon: Home, hint: 'Household' });
     for (const e of state.events) if (match(`${e.title} ${e.venue} event`)) out.push({ label: e.title, sub: `${fmtDate(e.date)} · ${e.venue || ''}`, to: '/', icon: CalendarDays, hint: 'Event' });
@@ -115,7 +122,7 @@ export default function QuickFind() {
     else if (e.key === 'Escape') setOpen(false);
   };
 
-  if (!open) return null;
+  if (!open || !featureOn(state.config, 'quickFind')) return null;
   return (
     <div className="fixed inset-0 z-[80] bg-ink-900/30 backdrop-blur-sm flex items-start justify-center p-4 pt-[12vh]" onMouseDown={() => setOpen(false)}>
       <div className="w-full max-w-xl rounded-4xl bg-white shadow-lift ring-glow overflow-hidden animate-fade-up" onMouseDown={(e) => e.stopPropagation()}>

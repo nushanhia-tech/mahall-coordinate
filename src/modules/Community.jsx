@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { BookOpen, Building2, Briefcase, GraduationCap, Phone, CalendarClock } from 'lucide-react';
-import { useApp } from '../store/AppContext';
+import { useApp, useFeature } from '../store/AppContext';
 import { usePhoneLookup, Field, Modal, Empty, SectionTitle, StatusBadge } from '../components/ui';
 import { inr, fmtDate, today } from '../utils/format';
 
 export function CoursesPage() {
   const { state, add, toast, user } = useApp();
   const [inst, setInst] = useState('');
+  const applyOn = useFeature('courseApply');
   const [apply, setApply] = useState(null);
   const [lookup, setLookup] = useState('');
   const courses = state.courses.filter((c) => !inst || c.institutionId === inst);
@@ -49,7 +50,7 @@ export function CoursesPage() {
                   <div className="text-xs text-slate-500">{state.institutions.find((i) => i.id === c.institutionId)?.name}</div>
                   <p className="text-sm text-slate-600 mt-2 flex-1">{c.description}</p>
                   <div className="flex flex-wrap gap-2 text-xs my-3"><span className="badge bg-slate-100">{c.duration}</span><span className="badge bg-brand-100 text-brand-800">{c.fee ? inr(c.fee) : 'Free'}</span><span className={`badge ${left > 0 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-700'}`}>{left > 0 ? `${left} seats left` : 'Full'}</span></div>
-                  <button className="btn-primary btn-sm" disabled={left <= 0} onClick={() => setApply({ courseId: c.id, name: user?.name || '', phone: '', age: '', qualification: '' })}>Apply</button>
+                  {applyOn && <button className="btn-primary btn-sm" disabled={left <= 0} onClick={() => setApply({ courseId: c.id, name: user?.name || '', phone: '', age: '', qualification: '' })}>Apply</button>}
                 </div>
               );
             })}

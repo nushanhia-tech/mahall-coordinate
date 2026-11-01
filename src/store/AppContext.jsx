@@ -3,9 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { uid } from '../utils/format';
 import StartupStatus from '../components/StartupStatus';
 import { getCurrentSlug } from '../router';
+import { featureOn, defaultConfig } from '../utils/features';
 
 const Ctx = createContext(null);
-const SETTINGS = ['masjid', 'accountHeads', 'chitty'];
+const SETTINGS = ['masjid', 'accountHeads', 'chitty', 'config'];
 
 // Work out which records changed between two versions of the state.
 function diff(prev, next) {
@@ -125,6 +126,9 @@ export function AppProvider({ children, initial = null }) {
       .finally(() => { pending.current -= 1; if (pending.current === 0) { clearTimeout(refetchTimer.current); refetchTimer.current = setTimeout(() => refresh(true), 250); } });
   }, [toast, scheduleRefresh]);
 
+  // Wait until every change has been saved, then reload (used before printing receipts that need server numbers).
+  const flush = useCallback(async () => { await queue.current; await refresh(); return stateRef.current; }, [refresh]);
+
   const add = useCallback((col, item) => { const id = item.id || uid(col.slice(0, 3)); update((s) => { s[col].push({ ...item, id }); }); return id; }, [update]);
   const patch = useCallback((col, id, changes) => update((s) => { const i = s[col].findIndex((x) => x.id === id); if (i >= 0) s[col][i] = { ...s[col][i], ...(typeof changes === 'function' ? changes(s[col][i]) : changes) }; }), [update]);
   const remove = useCallback((col, id) => update((s) => { s[col] = s[col].filter((x) => x.id !== id); }), [update]);
@@ -147,7 +151,7 @@ export function AppProvider({ children, initial = null }) {
   const closeDialog = (result) => { dialog?.resolve(result); setDialog(null); };
 
   return (
-    <Ctx.Provider value={{ state, update, add, patch, remove, user, login, logout, toast, eraseAll, importBackup, masjidInfo, ask, api, refresh, chittyMemberId, chittyLogin, chittyLogout }}>
+    <Ctx.Provider value={{ state, flush, update, add, patch, remove, user, login, logout, toast, eraseAll, importBackup, masjidInfo, ask, api, refresh, chittyMemberId, chittyLogin, chittyLogout }}>
       {notFound ? <MasjidNotFound /> : state && mounted ? children : state ? <PageShell name={masjidInfo?.name} /> : (
         <StartupStatus error={loadError} onRetry={() => { setLoadError(''); refresh(); }} />
       )}
@@ -214,3 +218,18 @@ function MasjidNotFound() {
     </div>
   );
 }
+
+// Settings document with safe defaults.
+export const useConfig = () => {
+  const { state } = useApp();
+  const d = defaultConfig();
+  const c = state?.config || {};
+  return { ...d, ...c, toggles: c.toggles || {}, vari: { ...d.vari, ...(c.vari || {}) } };
+};
+
+// Is this feature switched on? Admins always see everything.
+export const useFeature = (key, { forAdmins = false } = {}) => {
+  const { state, user } = useApp();
+  if (forAdmins && user?.role === 'admin') return true;
+  return featureOn(state?.config, key);
+};

@@ -1,19 +1,20 @@
 import { useState } from 'react';
-import { Check, X, Image as ImageIcon } from 'lucide-react';
+import { Check, X, Image as ImageIcon, FileDown } from 'lucide-react';
+import { donationReceiptPdf } from '../utils/receipts';
 import { useApp } from '../store/AppContext';
 import { Tabs, Modal, Field, ImageInput, StatusBadge, Empty, StoredImg } from '../components/ui';
 import { ChannelQR } from '../components/Donate';
 import { inr, fmtDateTime, uid } from '../utils/format';
 
 function Queue() {
-  const { state, update, toast } = useApp();
+  const { state, update, toast, flush } = useApp();
   const [status, setStatus] = useState('pending');
   const [act, setAct] = useState(null);
   const [shot, setShot] = useState(null);
   const list = [...state.donations].filter((d) => !status || d.status === status).sort((a, b) => b.date.localeCompare(a.date));
   const ch = (id) => state.donationChannels.find((c) => c.id === id);
 
-  const decide = (e) => {
+  const decide = async (e) => {
     e.preventDefault();
     update((s) => {
       const d = s.donations.find((x) => x.id === act.id);
@@ -24,8 +25,20 @@ function Queue() {
         s.transactions.push({ id: tid, date: new Date().toISOString().slice(0, 10), type: 'income', head: act.head, amount: d.amount, description: `Donation – ${ch(d.channelId)?.name} – ${d.name}`, receipt: d.screenshot, ref: d.id });
       }
     });
-    toast(act.decision === 'approved' ? `Approved – ${inr(act.amount)} added to ${act.head}` : 'Donation rejected');
+    toast(act.decision === 'approved' ? `Approved – ${inr(act.amount)} added to ${act.head}. Preparing the receipt…` : 'Donation rejected');
+    const id = act.id, approved = act.decision === 'approved';
     setAct(null);
+    if (approved) {
+      // wait for the server to give the ledger entry its receipt number, then hand the donor's receipt over
+      const fresh = await flush();
+      const d = fresh?.donations.find((x) => x.id === id);
+      if (d) printReceipt(d, fresh);
+    }
+  };
+
+  const printReceipt = (d, s = state) => {
+    const t = s.transactions.find((x) => x.id === d.transactionId);
+    donationReceiptPdf(s.masjid, { receiptNo: t?.docNo, name: d.name, phone: d.phone, amount: d.amount, channel: s.donationChannels.find((c) => c.id === d.channelId)?.name, date: d.date, decidedAt: d.decidedAt, note: d.note });
   };
 
   return (
@@ -48,6 +61,7 @@ function Queue() {
                     <button className="btn-primary btn-sm mr-1" onClick={() => setAct({ ...d, decision: 'approved', head: ch(d.channelId)?.accountHead || state.accountHeads[0], remark: '' })}><Check size={12} />Approve</button>
                     <button className="btn-danger btn-sm" onClick={() => setAct({ ...d, decision: 'rejected', remark: '' })}><X size={12} />Reject</button>
                   </>}
+                  {d.status === 'approved' && <button className="btn-outline btn-sm" onClick={() => printReceipt(d)}><FileDown size={12} />Receipt</button>}
                 </td>
               </tr>
             ))}

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { HomeIcon, Plus, Trash2, FileDown, Check, X, Eye, MapPin } from 'lucide-react';
-import { useApp } from '../store/AppContext';
+import { useApp, useFeature } from '../store/AppContext';
+import { MapEmbed } from '../screens/Dashboard';
 import { Field, Modal, StatusBadge, Empty, SectionTitle } from '../components/ui';
 import { fmtDateTime, uid } from '../utils/format';
 import { downloadPdf } from '../utils/pdf';
 
-const blank = (user) => ({ applicant: user?.name || '', phone: '', currentAddress: '', newAddress: '', ward: 'Ward 1', lat: '', lng: '', reason: '', family: [{ name: user?.name || '', age: '', relation: 'Self', gender: 'Male' }] });
+const blank = (user) => ({ applicant: user?.name || '', phone: '', currentAddress: '', newAddress: '', ward: 'Ward 1', lat: '', lng: '', gpsAccuracy: '', gpsCapturedAt: '', reason: '', family: [{ name: user?.name || '', age: '', relation: 'Self', gender: 'Male' }] });
 
 const counters = (state) => ({ homes: state.households.length, people: state.households.reduce((a, h) => a + Number(h.members || 0), 0) });
 
@@ -14,7 +15,7 @@ export function homeAppPdf(state, a) {
   downloadPdf({
     org: state.masjid, title: 'New Home Number Application', subtitle: `Application No. ${a.id.toUpperCase()} · Status: ${a.status.toUpperCase()}${a.homeNo ? ` · Home No. ${a.homeNo}` : ''}`,
     blocks: [
-      { kv: [['Applicant', a.applicant], ['Phone', a.phone], ['Current address', a.currentAddress], ['New home address', a.newAddress], ['Ward', a.ward], ['Location', a.lat && a.lng ? `${a.lat}, ${a.lng}` : '-'], ['Reason', a.reason || '-']] },
+      { kv: [['Applicant', a.applicant], ['Phone', a.phone], ['Current address', a.currentAddress], ['New home address', a.newAddress], ['Ward', a.ward], ['GPS location', a.lat && a.lng ? `${a.lat}, ${a.lng}${a.gpsAccuracy ? ` (±${a.gpsAccuracy} m)` : ''}` : '-'], ['GPS captured', a.gpsCapturedAt ? fmtDateTime(a.gpsCapturedAt) : 'Not captured live'], ['Reason', a.reason || '-']] },
       { heading: `Family members (${a.family.length})` },
       { table: { head: ['#', 'Name', 'Age', 'Gender', 'Relation'], body: a.family.map((f, i) => [i + 1, f.name, f.age, f.gender, f.relation]) } },
       { heading: 'Office use' },
@@ -30,18 +31,55 @@ export default function HomeApplyPage() {
   const [form, setForm] = useState(null);
   const mine = state.homeApps.filter((a) => a.userId === user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const setF = (i, k, v) => setForm({ ...form, family: form.family.map((f, j) => (j === i ? { ...f, [k]: v } : f)) });
-  const locate = () => navigator.geolocation?.getCurrentPosition((p) => setForm((f) => ({ ...f, lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6) })), () => toast('Location not available', 'error'));
+  const gpsRequired = useFeature('homeGpsRequired');
+  const enabled = useFeature('homeApplication', { forAdmins: true });
+  const [gps, setGps] = useState({ busy: false, error: '' });
+  // Live GPS from the phone. High accuracy, never a cached position.
+  const locate = () => {
+    if (!navigator.geolocation) return setGps({ busy: false, error: 'This device or browser cannot share its location.' });
+    setGps({ busy: true, error: '' });
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setForm((f) => ({ ...f, lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6), gpsAccuracy: Math.round(p.coords.accuracy), gpsCapturedAt: new Date().toISOString() }));
+        setGps({ busy: false, error: '' });
+      },
+      (err) => setGps({ busy: false, error: err.code === 1 ? 'Location permission was refused. Allow location for this site in your browser settings and try again.' : 'Could not get your location. Go outside or near a window and try again.' }),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  };
   const submit = (e) => {
     e.preventDefault();
     if (!form.family.length) return toast('Add at least one family member', 'error');
+    if (gpsRequired && !form.gpsCapturedAt) return toast('Please stand near your home and tap "Capture my live location" first', 'error');
     add('homeApps', { ...form, userId: user.id, status: 'pending', remark: '', createdAt: new Date().toISOString() });
     toast('Application submitted'); setForm(null);
   };
+  if (!enabled) return <div className="max-w-md mx-auto my-20 card text-center p-8"><div className="text-3xl">🏠</div><h2 className="font-display text-2xl mt-2">New home registration is not open online</h2><p className="text-sm text-ink-500 mt-2">Please contact the Mahall office.</p></div>;
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <SectionTitle icon={HomeIcon} title="New Home Number Application" subtitle="Register a new household with the Mahall." action={!form && <button className="btn-primary" onClick={() => setForm(blank(user))}>New application</button>} />
       {form && (
         <form onSubmit={submit} className="card space-y-4 mb-6">
+          <div className="rounded-3xl border-2 border-clay-400 bg-clay-50 p-5 flex flex-col sm:flex-row gap-4 sm:items-center" role="alert">
+            <div className="w-12 h-12 rounded-2xl bg-clay-500 text-white grid place-items-center shrink-0"><MapPin size={22} /></div>
+            <div className="flex-1">
+              <div className="font-display text-lg font-semibold text-clay-600">Disclaimer: You must physically stand near your home while filling out this application</div>
+              <p className="text-sm text-ink-600 mt-1">We record the live GPS position of your phone so the committee can find the house. {gpsRequired ? 'The application cannot be sent without it.' : ''}</p>
+            </div>
+            <button type="button" className="btn-danger shrink-0" onClick={locate} disabled={gps.busy}>{gps.busy ? 'Finding you…' : form.gpsCapturedAt ? 'Capture again' : 'Capture my live location'}</button>
+          </div>
+          {gps.error && <div className="text-sm text-clay-600 bg-clay-50 rounded-2xl px-4 py-2.5">{gps.error}</div>}
+          {form.gpsCapturedAt && (
+            <div className="rounded-3xl border border-brand-200 bg-brand-50 p-4 grid md:grid-cols-2 gap-4 items-center">
+              <div className="text-sm space-y-1">
+                <div className="font-semibold text-brand-800">✓ Live location captured</div>
+                <div className="font-mono text-xs">{form.lat}, {form.lng}</div>
+                <div className="text-xs text-ink-500">Accuracy about {form.gpsAccuracy} m · {fmtDateTime(form.gpsCapturedAt)}</div>
+                {form.gpsAccuracy > 100 && <div className="text-xs text-gold-600">Accuracy is low. Step outside and capture again for a better position.</div>}
+              </div>
+              <MapEmbed lat={Number(form.lat)} lng={Number(form.lng)} className="h-40 rounded-2xl border-0" />
+            </div>
+          )}
           <div className="grid sm:grid-cols-2 gap-3">
             <Field label="Applicant (head of family) *"><input className="input" required value={form.applicant} onChange={(e) => setForm({ ...form, applicant: e.target.value })} /></Field>
             <Field label="Phone *"><input className="input" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
@@ -49,9 +87,8 @@ export default function HomeApplyPage() {
             <Field label="New home address *"><input className="input" required value={form.newAddress} onChange={(e) => setForm({ ...form, newAddress: e.target.value })} /></Field>
             <Field label="Ward"><select className="input" value={form.ward} onChange={(e) => setForm({ ...form, ward: e.target.value })}>{['Ward 1', 'Ward 2', 'Ward 3', 'Ward 4', 'Ward 5'].map((w) => <option key={w}>{w}</option>)}</select></Field>
             <div className="flex gap-2 items-end">
-              <Field label="Latitude" className="flex-1"><input className="input" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} /></Field>
-              <Field label="Longitude" className="flex-1"><input className="input" value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value })} /></Field>
-              <button type="button" className="btn-outline" onClick={locate} title="Use my location"><MapPin size={14} /></button>
+              <Field label="Latitude (from GPS)" className="flex-1"><input className="input bg-sand-50" readOnly={gpsRequired} value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value, gpsCapturedAt: '' })} /></Field>
+              <Field label="Longitude (from GPS)" className="flex-1"><input className="input bg-sand-50" readOnly={gpsRequired} value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value, gpsCapturedAt: '' })} /></Field>
             </div>
             <Field label="Reason (new house, separated family, moved in …)" className="sm:col-span-2"><input className="input" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></Field>
           </div>
@@ -86,7 +123,7 @@ export default function HomeApplyPage() {
   );
 }
 
-export function HomeAppsAdmin() {
+export function HomeAppsAdmin({ readOnly = false }) {
   const { state, update, patch, toast } = useApp();
   const [status, setStatus] = useState('pending');
   const [view, setView] = useState(null);
@@ -117,15 +154,16 @@ export function HomeAppsAdmin() {
       <table className="table"><thead><tr><th>Submitted</th><th>Applicant</th><th>Members</th><th>Address</th><th>Status</th><th /></tr></thead>
         <tbody>{list.map((a) => (
           <tr key={a.id}><td className="text-xs">{fmtDateTime(a.createdAt)}</td><td className="font-medium">{a.applicant}<div className="text-xs text-slate-500">{a.phone}</div></td><td>{a.family.length}</td><td className="text-xs">{a.newAddress}<div>{a.ward}</div></td><td><StatusBadge status={a.status} />{a.homeNo && <div className="text-xs font-semibold text-brand-700">{a.homeNo}</div>}</td>
-            <td className="text-right whitespace-nowrap"><button className="btn-outline btn-sm mr-1" onClick={() => setView({ ...a, homeNo: a.homeNo || nextNo(), remark: a.remark || '' })}><Eye size={12} />Review</button><button className="btn-outline btn-sm" onClick={() => homeAppPdf(state, a)}><FileDown size={12} /></button></td></tr>
+            <td className="text-right whitespace-nowrap"><button className="btn-outline btn-sm mr-1" onClick={() => setView({ ...a, homeNo: a.homeNo || nextNo(), remark: a.remark || '' })}><Eye size={12} />{readOnly ? 'View' : 'Review'}</button><button className="btn-outline btn-sm" onClick={() => homeAppPdf(state, a)}><FileDown size={12} /></button></td></tr>
         ))}</tbody></table>
       {!list.length && <Empty>No applications.</Empty>}
       <Modal open={!!view} onClose={() => setView(null)} title="New home application" wide>
         {view && (
           <div className="space-y-3 text-sm">
-            <div className="grid sm:grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg">{Object.entries({ Applicant: view.applicant, Phone: view.phone, 'Current address': view.currentAddress, 'New address': view.newAddress, Ward: view.ward, Location: view.lat ? `${view.lat}, ${view.lng}` : '—', Reason: view.reason }).map(([l, v]) => <div key={l}><span className="text-slate-500">{l}:</span> {v || '—'}</div>)}</div>
+            <div className="grid sm:grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg">{Object.entries({ Applicant: view.applicant, Phone: view.phone, 'Current address': view.currentAddress, 'New address': view.newAddress, Ward: view.ward, Location: view.lat ? `${view.lat}, ${view.lng}${view.gpsAccuracy ? ` (±${view.gpsAccuracy} m, live GPS ${fmtDateTime(view.gpsCapturedAt)})` : ' (typed, not live GPS)'}` : '—', Reason: view.reason }).map(([l, v]) => <div key={l}><span className="text-slate-500">{l}:</span> {v || '—'}</div>)}</div>
+            {view.lat && view.lng && <MapEmbed lat={Number(view.lat)} lng={Number(view.lng)} className="h-48 rounded-2xl" />}
             <table className="table"><thead><tr><th>Name</th><th>Age</th><th>Gender</th><th>Relation</th></tr></thead><tbody>{view.family.map((f, i) => <tr key={i}><td>{f.name}</td><td>{f.age}</td><td>{f.gender}</td><td>{f.relation}</td></tr>)}</tbody></table>
-            {view.status === 'pending' ? (
+            {view.status === 'pending' && !readOnly ? (
               <>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <Field label="Assign home number"><input className="input" value={view.homeNo} onChange={(e) => setView({ ...view, homeNo: e.target.value })} /></Field>

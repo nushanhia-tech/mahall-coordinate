@@ -1,16 +1,54 @@
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { HeartHandshake, Copy, Send } from 'lucide-react';
-import { useApp } from '../store/AppContext';
+import { useApp, useFeature } from '../store/AppContext';
+import { featureOn } from '../utils/features';
+import { usePhoneLookup, StatusBadge } from './ui';
+import { donationReceiptPdf } from '../utils/receipts';
+import { inr as inrFmt, fmtDate } from '../utils/format';
 import { Modal, Field, ImageInput } from './ui';
 
 export const ChannelQR = ({ channel, size = 120 }) =>
   channel.qrImage ? <img src={channel.qrImage} alt={`${channel.name} QR`} style={{ width: size, height: size }} className="object-contain" />
     : <QRCodeSVG value={channel.qr || `upi://pay?pa=${channel.upi}`} size={size} />;
 
+function ReceiptLookup({ masjid }) {
+  const [phone, setPhone] = useState('');
+  const rows = usePhoneLookup('donations', phone);
+  return (
+    <div className="relative mt-6 card !bg-white/80">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="flex-1 min-w-[220px]">
+          <div className="font-display text-lg font-semibold">Already donated? Get your receipt</div>
+          <p className="text-xs text-ink-500 mt-0.5">Enter the phone number you used. Once the committee confirms your gift, your official receipt is ready to download.</p>
+        </div>
+        <input className="input sm:w-64" inputMode="tel" placeholder="Your phone number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </div>
+      {phone.trim().length >= 10 && (
+        <div className="mt-4 space-y-2">
+          {rows.map((d) => (
+            <div key={d.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-sand-200 px-4 py-3 text-sm">
+              <div className="flex-1 min-w-0"><b>{inrFmt(d.amount)}</b> · {d.channel} <span className="text-xs text-ink-400">· {fmtDate(d.date)}</span>{d.status === 'rejected' && d.remark && <div className="text-xs text-clay-600">{d.remark}</div>}</div>
+              <StatusBadge status={d.status === 'approved' ? 'confirmed' : d.status} />
+              {d.status === 'approved' && <button className="btn-primary btn-sm" onClick={() => donationReceiptPdf(masjid, d)}>Download receipt</button>}
+              {d.status === 'pending' && <span className="text-xs text-ink-400">Waiting for the committee to confirm</span>}
+            </div>
+          ))}
+          {!rows.length && <div className="text-xs text-ink-400">No donations found for this number yet.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DonateSection() {
   const { state, add, toast } = useApp();
   const [form, setForm] = useState(null);
+  const lookupOn = useFeature('donationReceiptLookup');
+  const { user } = useApp();
+  const KEYS = ['donateMasjid', 'donateRelief', 'donateNercha'];
+  // visitors already receive only the switched-on channels; admins see the page as members would
+  const channels = user?.role === 'admin' ? state.donationChannels.filter((c, i) => !KEYS[i] || featureOn(state.config, KEYS[i])) : state.donationChannels;
 
   const submit = (e) => {
     e.preventDefault();
@@ -30,7 +68,7 @@ export default function DonateSection() {
           <p className="text-ink-600 mt-3 leading-relaxed">Scan a QR code with any UPI app, or transfer to the bank account. Then tap <b>“I have donated”</b> so we can thank you and show it in our open accounts.</p>
         </div>
         <div className="relative grid md:grid-cols-3 gap-4 mt-8">
-          {state.donationChannels.map((c, idx) => (
+          {channels.map((c, idx) => (
             <div key={c.id} className="card card-hover flex flex-col !bg-white animate-fade-up" style={{ animationDelay: `${idx * 60}ms` }}>
               <h3 className="font-display text-xl font-semibold text-ink-900">{c.name}</h3>
               <div className="flex gap-4 mt-4">
@@ -50,6 +88,7 @@ export default function DonateSection() {
             </div>
           ))}
         </div>
+        {lookupOn && <ReceiptLookup masjid={state.masjid} />}
       </div>
       <Modal open={!!form} onClose={() => setForm(null)} title="Submit donation proof">
         {form && (

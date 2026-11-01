@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Home, Users, ShoppingCart, Coins, Gavel, FileHeart, HomeIcon, MessageCircle, BookOpen, CalendarDays, GraduationCap, Building2, HeartHandshake } from 'lucide-react';
 import { useApp } from '../store/AppContext';
+import { featureOn } from '../utils/features';
+import { MyVari } from '../modules/Vari';
+import { InstitutionReports } from '../modules/InstitutionReports';
+import { MediationAdmin } from '../modules/Mediation';
+import { HomeAppsAdmin } from '../modules/HomeApply';
 import { navigate } from '../router';
 import { StatCard, StatusBadge, Tabs, CrudManager, Field, ImageInput, Empty } from '../components/ui';
 import EventCalendar from '../components/EventCalendar';
@@ -29,6 +34,7 @@ const Header = ({ user, subtitle }) => (
 
 export function IndividualPortal() {
   const { state, user } = useApp();
+  const on = (k) => featureOn(state.config, k);
   const hh = state.households.find((h) => h.id === user.householdId);
   const unread = state.chats.filter((c) => c.userId === user.id).reduce((a, c) => a + c.messages.filter((m) => m.from === 'admin' && !m.read).length, 0);
   const nikkah = state.nikkahApps.filter((a) => a.userId === user.id);
@@ -53,15 +59,18 @@ export function IndividualPortal() {
         <StatCard icon={Users} label="Community members" value={state.households.reduce((a, h) => a + Number(h.members), 0)} color="blue" />
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <Tile icon={ShoppingCart} label="Rental Cart" to="/services/rental" />
-        <Tile icon={Coins} label="Chitty Money" to="/services/chitty" />
-        <Tile icon={Gavel} label="Live Auction" to="/services/auction" />
-        <Tile icon={MessageCircle} label="Mediation Chat" to="/mediation" badge={unread} />
-        <Tile icon={FileHeart} label="Nikkah Application" to="/apply/nikkah" />
-        <Tile icon={HomeIcon} label="New Home Number" to="/apply/home" />
-        <Tile icon={BookOpen} label="Courses" to="/courses" />
-        <Tile icon={HeartHandshake} label="Donate" to="/" />
+        {[
+          ['rental', ShoppingCart, 'Rental cart', '/services/rental'],
+          ['chitty', Coins, 'Chitty money', '/services/chitty'],
+          ['auction', Gavel, 'Live auction', '/services/auction'],
+          ['mediation', MessageCircle, 'Enquiry & mediation', '/mediation', unread],
+          ['nikkah', FileHeart, 'Nikkah application', '/apply/nikkah'],
+          ['homeApplication', HomeIcon, 'New home number', '/apply/home'],
+          ['courseApply', BookOpen, 'Courses', '/courses'],
+          ['homeDonate', HeartHandshake, 'Donate', '/'],
+        ].filter(([k]) => on(k)).map(([k, icon, label, to, badge]) => <Tile key={k} icon={icon} label={label} to={to} badge={badge} />)}
       </div>
+      <div className="mb-6"><MyVari /></div>
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <div className="card">
           <h3 className="font-bold mb-2">My applications</h3>
@@ -70,11 +79,11 @@ export function IndividualPortal() {
           ))}
           {!nikkah.length && !homes.length && <Empty>No applications.</Empty>}
         </div>
-        <div className="card">
+        {on('memberDonations') && <div className="card">
           <h3 className="font-bold mb-2">My donations</h3>
           {myDonations.map((d) => <div key={d.id} className="flex justify-between py-2 border-b last:border-0 text-sm"><span>{state.donationChannels.find((c) => c.id === d.channelId)?.name} · {inr(d.amount)}<div className="text-xs text-slate-400">{fmtDate(d.date)}</div></span><StatusBadge status={d.status} /></div>)}
           {!myDonations.length && <Empty>Donations from your household phone number appear here.</Empty>}
-        </div>
+        </div>}
       </div>
       <h3 className="font-bold mb-3 flex items-center gap-2"><CalendarDays size={18} className="text-brand-600" />Events</h3>
       <EventCalendar events={state.events} />
@@ -86,6 +95,8 @@ export function KhateebPortal() {
   const { state, user } = useApp();
   const [tab, setTab] = useState('nikkah');
   const pending = state.nikkahApps.filter((a) => a.status === 'pending').length;
+  const homePending = state.homeApps.filter((a) => a.status === 'pending').length;
+  const unreadMsgs = state.chats.filter((c) => c.userId !== user.id).reduce((a, c) => a + c.messages.filter((m) => m.from === 'member' && !m.read).length, 0);
   const upcomingNikkah = state.nikkahApps.filter((a) => a.status === 'approved' && a.date >= new Date().toISOString().slice(0, 10)).sort((a, b) => a.date.localeCompare(b.date));
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -95,7 +106,24 @@ export function KhateebPortal() {
         <StatCard icon={CalendarDays} label="Upcoming events" value={state.events.filter((e) => e.date >= new Date().toISOString().slice(0, 10)).length} />
         <StatCard icon={FileHeart} label="Approved Nikkahs ahead" value={upcomingNikkah.length} color="purple" />
       </div>
-      <Tabs active={tab} onChange={setTab} tabs={[{ id: 'nikkah', label: 'Nikkah applications', count: pending }, { id: 'schedule', label: 'Nikkah schedule' }, { id: 'events', label: 'Events & achievements' }]} />
+      <Tabs active={tab} onChange={setTab} tabs={[
+        { id: 'nikkah', label: 'Nikkah applications', count: pending },
+        { id: 'forms', label: 'Other submitted forms', count: homePending },
+        { id: 'messages', label: 'Messages', count: unreadMsgs },
+        { id: 'schedule', label: 'Nikkah schedule' },
+        { id: 'events', label: 'Events & achievements' },
+        { id: 'profile', label: 'My profile' },
+      ]} />
+      {tab === 'forms' && <div><p className="text-sm text-ink-500 mb-3">New home number applications submitted by families (view only – the committee approves them).</p><HomeAppsAdmin readOnly /></div>}
+      {tab === 'messages' && <div><p className="text-sm text-ink-500 mb-3">Problems and questions that members chose to send to the Khateeb (alone, or together with the committee).</p><MediationAdmin me="khateeb" /></div>}
+      {tab === 'profile' && (
+        <div className="card max-w-2xl space-y-3">
+          <h3 className="h2">{user.name}</h3>
+          {[['Education', user.education], ['Religious qualification', user.qualification], ['Graduation details', user.graduation]].map(([l, v]) => (
+            <div key={l} className="flex gap-4 py-2 border-b border-sand-200 last:border-0"><span className="w-48 text-sm text-ink-500">{l}</span><span className="text-sm font-semibold">{v || <span className="text-ink-400 font-normal">Not added yet – ask the admin to add it in Manage Portals</span>}</span></div>
+          ))}
+        </div>
+      )}
       {tab === 'nikkah' && <NikkahAdmin />}
       {tab === 'schedule' && (
         <div className="card">
@@ -124,7 +152,8 @@ export function InstitutionPortal() {
         <StatCard icon={BookOpen} label="Courses" value={courses.length} />
         <StatCard icon={Building2} label="Pending applications" value={pending} color="red" />
       </div>
-      <Tabs active={tab} onChange={setTab} tabs={[{ id: 'profile', label: 'Profile' }, { id: 'courses', label: 'Courses' }, { id: 'apps', label: 'Applications', count: pending }]} />
+      <Tabs active={tab} onChange={setTab} tabs={[{ id: 'profile', label: 'Profile' }, { id: 'courses', label: 'Courses' }, { id: 'apps', label: 'Applications', count: pending }, ...(featureOn(state.config, 'institutionReports') ? [{ id: 'reports', label: 'Financial reports' }] : [])]} />
+      {tab === 'reports' && <InstitutionReports institutionId={inst.id} />}
       {tab === 'profile' && (
         <form className="card grid sm:grid-cols-2 gap-3 max-w-3xl" onSubmit={(e) => { e.preventDefault(); patch('institutions', inst.id, { ...p, students: Number(p.students) }); toast('Profile updated – dashboard student count refreshed'); }}>
           <Field label="Photo" className="sm:col-span-2"><ImageInput value={p.photo} onChange={(v) => setP({ ...p, photo: v })} label="Upload photo" /></Field>

@@ -31,7 +31,10 @@ export default function UsersAdmin() {
         { name: 'role', label: 'Role', type: 'select', required: true, options: [{ value: 'admin', label: 'Admin' }, { value: 'individual', label: 'Individual' }, { value: 'khateeb', label: 'Khateeb' }, { value: 'institution', label: 'Institution' }], render: (u) => <span className="badge bg-brand-100 text-brand-800 capitalize">{u.role}</span> },
         { name: 'householdId', label: 'Linked home (individuals)', type: 'select', table: false, options: state.households.map((h) => ({ value: h.id, label: `${h.homeNo} · ${h.headName}` })) },
         { name: 'institutionId', label: 'Linked institution', type: 'select', table: false, options: state.institutions.map((i) => ({ value: i.id, label: i.name })) },
-        { name: 'link', label: 'Linked to', form: false, render: linkLabel },
+        { name: 'education', label: 'Education *', table: false, full: true, required: true, show: (u) => u.role === 'khateeb' },
+        { name: 'qualification', label: 'Religious qualification *', table: false, full: true, required: true, show: (u) => u.role === 'khateeb' },
+        { name: 'graduation', label: 'Graduation details (institution, year) *', table: false, full: true, required: true, show: (u) => u.role === 'khateeb' },
+        { name: 'link', label: 'Linked to / qualification', form: false, render: (u) => (u.role === 'khateeb' ? <span className="text-xs">{u.qualification || <span className="text-gold-600">Add qualification</span>}{u.graduation ? ` · ${u.graduation}` : ''}</span> : linkLabel(u)) },
       ]}
       canDelete={(u) => u.id !== user.id && !(u.role === 'admin' && admins <= 1)}
       onAdd={(d) => { if (validate(d)) { add('users', d); toast('User created'); } }}

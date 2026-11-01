@@ -1,6 +1,7 @@
 import { handle, json, body } from '@/lib/api';
 import { sql } from '@/lib/db';
-import { HttpError, getMasjid } from '@/lib/state';
+import { HttpError, getMasjid, getConfig } from '@/lib/state';
+import { featureOn } from '@/utils/features';
 import { readOne } from '@/lib/repo';
 import { uid } from '@/utils/format';
 
@@ -13,6 +14,7 @@ export const POST = handle(async (req) => {
   if (!String(bidder).trim() || !String(phone).trim()) throw new HttpError(400, 'Name and phone are required');
   const amt = Number(amount);
   const masjid = await getMasjid(req);
+  if (!featureOn(await getConfig(masjid.id), 'auction')) throw new HttpError(403, 'The auction is closed.');
   await sql.begin(async (tx) => {
     // Lock the auction row so simultaneous bids are handled one at a time.
     const [locked] = await tx`select id from auction_items where id = ${String(itemId)} and masjid_id = ${masjid.id} for update`;

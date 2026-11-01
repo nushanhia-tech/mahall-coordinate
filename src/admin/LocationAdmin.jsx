@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
-import { CrudManager, Field } from '../components/ui';
+import { CrudManager, Field, ImageInput } from '../components/ui';
 import { MapEmbed } from '../screens/Dashboard';
 
 export default function LocationAdmin() {
@@ -8,8 +8,31 @@ export default function LocationAdmin() {
   const [m, setM] = useState(state.masjid);
   const save = (e) => { e.preventDefault(); update((s) => { s.masjid = { ...m, lat: Number(m.lat), lng: Number(m.lng) }; }); toast('Masjid details saved'); };
   const locate = () => navigator.geolocation?.getCurrentPosition((p) => setM({ ...m, lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6) }), () => toast('Could not get location', 'error'));
+  const saveBranding = (patch) => { update((st) => { st.masjid = { ...st.masjid, ...patch }; }); setM((x) => ({ ...x, ...patch })); toast('Branding updated – visible across the site'); };
   return (
     <div className="space-y-6">
+      <div className="card">
+        <h3 className="h2">Masjid logo & photo</h3>
+        <p className="text-sm text-ink-500 mt-1">The logo appears in the header, footer, login page and masjid directory. The photo appears behind the welcome section on the home page and on the login page.</p>
+        <div className="grid md:grid-cols-2 gap-5 mt-5">
+          <div className="rounded-3xl border border-sand-200 p-4 flex items-center gap-4">
+            {m.logo ? <img src={m.logo} alt="Logo" className="w-20 h-20 rounded-2xl object-cover ring-1 ring-sand-200" /> : <div className="w-20 h-20 rounded-2xl bg-sand-100 grid place-items-center text-ink-400 text-xs text-center">No logo</div>}
+            <div className="space-y-2">
+              <div className="font-semibold text-sm">Logo</div>
+              <div className="text-xs text-ink-500">Square image works best (e.g. 512 × 512).</div>
+              <ImageInput value={m.logo} onChange={(v) => saveBranding({ logo: v })} label={m.logo ? 'Change logo' : 'Upload logo'} maxSize={400} />
+            </div>
+          </div>
+          <div className="rounded-3xl border border-sand-200 p-4 flex items-center gap-4">
+            {m.photo ? <img src={m.photo} alt="Masjid" className="w-32 h-20 rounded-2xl object-cover ring-1 ring-sand-200" /> : <div className="w-32 h-20 rounded-2xl bg-sand-100 grid place-items-center text-ink-400 text-xs">No photo</div>}
+            <div className="space-y-2">
+              <div className="font-semibold text-sm">Masjid photo</div>
+              <div className="text-xs text-ink-500">A wide photo of the masjid (landscape).</div>
+              <ImageInput value={m.photo} onChange={(v) => saveBranding({ photo: v })} label={m.photo ? 'Change photo' : 'Upload photo'} maxSize={1400} />
+            </div>
+          </div>
+        </div>
+      </div>
       <form onSubmit={save} className="card grid lg:grid-cols-2 gap-4">
         <div className="grid grid-cols-2 gap-3 content-start">
           <Field label="Masjid / Mahall name" className="col-span-2"><input className="input" value={m.name} onChange={(e) => setM({ ...m, name: e.target.value })} required /></Field>

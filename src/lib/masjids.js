@@ -20,7 +20,7 @@ export const forgetMasjid = (slug) => cache.delete(slug);
 export async function listMasjids({ includeInactive = false } = {}) {
   return sql`
     select m.id, m.slug, m.name, m.active, m.created_at,
-           coalesce(p.address, '') as address,
+           coalesce(p.address, '') as address, coalesce(p.logo, '') as logo,
            (select count(*)::int from households h where h.masjid_id = m.id) as homes,
            (select count(*)::int from users u where u.masjid_id = m.id) as users
     from masjids m left join masjid_profile p on p.masjid_id = m.id
