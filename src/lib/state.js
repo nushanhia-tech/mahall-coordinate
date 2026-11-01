@@ -3,13 +3,10 @@ import { sql } from './db';
 import { getUserSession, getChittySession } from './auth';
 import { seed, seedChittyPayments } from '../store/seed';
 import { UNIT_MS } from '../utils/format';
+import { COLLECTIONS, SETTINGS } from './schema';
+import { readCollection, readOne, readSettings, writeSetting, upsertRow, deleteRow, wipeAll } from './repo';
 
-export const COLLECTIONS = [
-  'households', 'institutions', 'courses', 'courseApplications', 'opportunities', 'services', 'transactions',
-  'donationChannels', 'donations', 'events', 'achievements', 'committee', 'helpdesk', 'users', 'rentalItems',
-  'rentals', 'chittyMembers', 'chittyPayments', 'auctionItems', 'chats', 'nikkahApps', 'homeApps',
-];
-export const SETTINGS = ['masjid', 'accountHeads', 'chitty'];
+export { COLLECTIONS, SETTINGS };
 const SECRET_COLLECTIONS = ['users', 'chittyMembers']; // have a hashed `password` field
 
 export class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
@@ -20,16 +17,12 @@ const hashIfNeeded = async (p) => (isHash(p) ? p : bcrypt.hash(String(p), 10));
 // ---------- seeding ----------
 
 async function writeAll(tx, state) {
-  for (const key of SETTINGS) {
-    await tx`insert into settings (key, data) values (${key}, ${tx.json(state[key])})
-             on conflict (key) do update set data = excluded.data, updated_at = now()`;
-  }
+  for (const key of SETTINGS) await writeSetting(tx, key, state[key]);
   for (const col of COLLECTIONS) {
     for (const row of state[col] || []) {
       const data = { ...row };
       if (SECRET_COLLECTIONS.includes(col) && data.password) data.password = await hashIfNeeded(data.password);
-      await tx`insert into records (collection, id, data) values (${col}, ${data.id}, ${tx.json(data)})
-               on conflict (collection, id) do update set data = excluded.data, updated_at = now()`;
+      await upsertRow(tx, col, data);
     }
   }
 }
@@ -39,11 +32,11 @@ export const demoState = () => { const s = seed(); s.chittyPayments = seedChitty
 let seeded = false;
 export async function ensureSeeded() {
   if (seeded) return;
-  const [{ n }] = await sql`select count(*)::int as n from settings`;
+  const [{ n }] = await sql`select count(*)::int as n from masjid_profile`;
   if (n === 0) {
     await sql.begin(async (tx) => {
       await tx`select pg_advisory_xact_lock(4242)`;
-      const [{ n: again }] = await tx`select count(*)::int as n from settings`;
+      const [{ n: again }] = await tx`select count(*)::int as n from masjid_profile`;
       if (again === 0) await writeAll(tx, demoState());
     });
   }
@@ -52,8 +45,7 @@ export async function ensureSeeded() {
 
 export async function replaceAll(state) {
   await sql.begin(async (tx) => {
-    await tx`delete from records`;
-    await tx`delete from settings`;
+    await wipeAll(tx);
     await writeAll(tx, state);
     await tx`insert into app_events (collections) values (${['*']})`;
   });
@@ -63,26 +55,21 @@ export async function replaceAll(state) {
 
 export async function loadRaw() {
   await ensureSeeded();
-  const state = {};
-  for (const k of SETTINGS) state[k] = null;
-  for (const c of COLLECTIONS) state[c] = [];
-  for (const r of await sql`select key, data from settings`) state[r.key] = r.data;
-  for (const r of await sql`select collection, data from records order by updated_at, id`) {
-    if (state[r.collection]) state[r.collection].push(r.data);
-  }
-  return state;
+  return sql.begin('read only', async (tx) => {
+    const state = await readSettings(tx);
+    for (const c of COLLECTIONS) state[c] = await readCollection(tx, c);
+    return state;
+  });
 }
 
 export async function getContext() {
   const [us, cs] = await Promise.all([getUserSession(), getChittySession()]);
   let user = null, chittyMember = null;
   if (us?.userId) {
-    const [r] = await sql`select data from records where collection = 'users' and id = ${us.userId}`;
-    user = r?.data || null;
+    user = await readOne(sql, 'users', us.userId);
   }
   if (cs?.memberId) {
-    const [r] = await sql`select data from records where collection = 'chittyMembers' and id = ${cs.memberId}`;
-    chittyMember = r?.data || null;
+    chittyMember = await readOne(sql, 'chittyMembers', cs.memberId);
   }
   return { user, chittyMember, role: user?.role || 'public' };
 }
@@ -175,7 +162,7 @@ export async function applyChanges(ctx, changes) {
   for (const [key, value] of Object.entries(changes.settings || {})) {
     if (!SETTINGS.includes(key)) throw new HttpError(400, `Unknown setting ${key}`);
     if (ctx.role !== 'admin') throw new HttpError(403, 'Only admins can change settings');
-    ops.push((tx) => tx`insert into settings (key, data) values (${key}, ${tx.json(value)}) on conflict (key) do update set data = excluded.data, updated_at = now()`);
+    ops.push((tx) => writeSetting(tx, key, value));
     touched.add(key);
   }
 
@@ -185,7 +172,7 @@ export async function applyChanges(ctx, changes) {
       const before = db[col].find((r) => r.id === id);
       if (!before) continue;
       if (!allowed(ctx, col, before, null, db)) throw new HttpError(403, `Not allowed to delete from ${col}`);
-      ops.push((tx) => tx`delete from records where collection = ${col} and id = ${id}`);
+      ops.push((tx) => deleteRow(tx, col, id));
       touched.add(col);
     }
     for (const incoming of upserts) {
@@ -199,8 +186,7 @@ export async function applyChanges(ctx, changes) {
       }
       if (!allowed(ctx, col, before, row, db)) throw new HttpError(403, `Not allowed to change ${col}`);
       row = normalise(col, row, db);
-      ops.push((tx) => tx`insert into records (collection, id, data) values (${col}, ${row.id}, ${tx.json(row)})
-                          on conflict (collection, id) do update set data = excluded.data, updated_at = now()`);
+      ops.push((tx) => upsertRow(tx, col, row));
       touched.add(col);
     }
   }

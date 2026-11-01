@@ -1,5 +1,6 @@
 import { handle, json, body } from '@/lib/api';
 import { sql } from '@/lib/db';
+import { findBy } from '@/lib/repo';
 import { ensureSeeded, verifyPassword } from '@/lib/state';
 import { setChittySession } from '@/lib/auth';
 
@@ -8,8 +9,8 @@ export const dynamic = 'force-dynamic';
 export const POST = handle(async (req) => {
   const { code = '', password = '' } = await body(req);
   await ensureSeeded();
-  const [row] = await sql`select data from records where collection = 'chittyMembers' and lower(data->>'code') = ${String(code).trim().toLowerCase()}`;
-  if (!row || !(await verifyPassword(password, row.data.password))) return json({ error: 'Wrong Chitty number or password' }, 401);
-  await setChittySession(row.data.id);
-  return json({ memberId: row.data.id });
+  const [m] = await findBy(sql, 'chittyMembers', 'code', String(code).trim(), { ci: true });
+  if (!m || !(await verifyPassword(password, m.password))) return json({ error: 'Wrong Chitty number or password' }, 401);
+  await setChittySession(m.id);
+  return json({ memberId: m.id });
 });

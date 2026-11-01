@@ -70,12 +70,19 @@ export function AppProvider({ children }) {
   // Live updates: Supabase Realtime pings when anything changes; plain polling as a fallback.
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    let channel = null, client = null;
+    let channel = null, client = null, live = false, last = Date.now();
     if (url && key) {
       client = createClient(url, key);
-      channel = client.channel('app-events').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_events' }, scheduleRefresh).subscribe();
+      channel = client.channel('app-events')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_events' }, scheduleRefresh)
+        .subscribe((status) => { live = status === 'SUBSCRIBED'; });
     }
-    const poll = setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, channel ? 30000 : 4000);
+    // While the live connection is up, check rarely; otherwise every 4 seconds.
+    const poll = setInterval(() => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < (live ? 30000 : 4000)) return;
+      last = Date.now();
+      refresh();
+    }, 1000);
     return () => { clearInterval(poll); if (channel) client.removeChannel(channel); };
   }, [refresh, scheduleRefresh]);
 

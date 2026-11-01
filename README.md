@@ -7,10 +7,15 @@ Smart Community & Masjid ERP.
 ## How it fits together
 - **Frontend** – the React screens in `src/` run in the browser. Real URLs like `/admin/accounts`, `/services/auction`.
 - **API** – Next.js route handlers in `src/app/api/*` run on Vercel. They talk to Supabase Postgres over `DATABASE_URL`.
-- **Database** – Supabase Postgres (`supabase/migrations/0001_init.sql`):
-  - `records` – one row per item (household, transaction, donation, rental, bid…), grouped by `collection`, fields in `data` (jsonb)
-  - `settings` – masjid details, account heads, chitty settings
+- **Database** – Supabase Postgres, one table per kind of data (`supabase/migrations/0001_init.sql`, 31 tables):
+  - Community: `households` (+ `household_members`), `institutions`, `users`, `courses`, `course_applications`, `opportunities`, `services`, `events`, `achievements`, `committee_members`, `helpdesk_contacts`
+  - Finance: `transactions`, `account_heads`, `donation_channels`, `donations`
+  - Services: `rental_items`, `rentals` (+ `rental_lines`), `chitty_settings`, `chitty_members`, `chitty_payments`, `auction_items` (+ `auction_bids`)
+  - Applications & chat: `nikkah_applications`, `home_applications` (+ `home_application_members`), `chats` (+ `chat_messages`)
+  - Settings: `masjid_profile`
   - `app_events` – a "something changed" ping; browsers subscribe via Supabase Realtime and refresh (live auction, chat)
+  - Foreign keys, status checks and indexes are in the migration. Each table has an `extra` jsonb column so new fields never get lost.
+  - `src/lib/schema.js` maps app fields to columns; `src/lib/repo.js` reads/writes the tables.
 - **Security** – row-level security is on and browsers never get database access. All reads and writes go through the API, which:
   - hashes passwords (bcrypt) and signs login cookies (httpOnly JWT)
   - only shows each person their own private data (chats, applications, chitty payments…)

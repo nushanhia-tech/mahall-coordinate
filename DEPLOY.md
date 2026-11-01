@@ -4,11 +4,12 @@
 1. Create a project at https://supabase.com (choose the Mumbai region for India).
 2. **SQL Editor → New query**: paste the contents of `supabase/migrations/0001_init.sql` and run it.
    (Or locally: put the connection string in `.env.local` and run `npm run db:migrate`.)
-3. Collect these values:
+3. Check **Table Editor**: you should see 31 tables (households, transactions, donations, rentals, …).
+4. Collect these values:
    - **Project Settings → Database → Connection string → Transaction pooler** (port 6543) → `DATABASE_URL`
      (replace `[YOUR-PASSWORD]` with your database password)
-   - **Project Settings → API** → Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-   - **Project Settings → API** → `anon` public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://qxtxuzlijzivddclmlpg.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your anon key (Project Settings → API). It is public by design: row-level security blocks it from reading any data.
 
 ## 2. GitHub (versioning)
 ```bash
