@@ -5,6 +5,7 @@ const globalForDb = globalThis;
 export const sql = globalForDb.__mahallSql ?? postgres(process.env.DATABASE_URL, {
   prepare: false, // required for Supabase's transaction pooler
   max: 10,
+  max_pipeline: 1, // Supabase's transaction pooler can hang when several queries share one connection at once
   idle_timeout: 20,
   connect_timeout: 15,
   ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL || '') ? false : 'require',

@@ -115,39 +115,50 @@ export async function wipeAll(tx) {
 
 // ---------- fast paths ----------
 
-// Read every table at once (all queries run in parallel), then stitch children onto parents.
-export async function readAll(db) {
-  const jobs = [];
+// Read every table in ONE query: the database builds a single JSON document with all the data.
+// One round trip is the fastest option and avoids sending many queries through the pooler at once.
+let readAllSql = null;
+function buildReadAllSql() {
+  const parts = [];
+  for (const [key, spec] of Object.entries(SETTING_SPEC)) {
+    parts.push(`'s:${key}', (select row_to_json(t) from (select ${selectList(spec.fields, ['"extra"'])} from ${q(spec.table)} where id = 'main') t)`);
+  }
+  parts.push(`'s:accountHeads', (select coalesce(json_agg(name order by position, name), '[]'::json) from account_heads)`);
   for (const [col, spec] of Object.entries(COLLECTION_SPEC)) {
-    jobs.push(db.unsafe(`select "id", "extra", ${selectList(spec.fields)} from ${q(spec.table)} order by created_at, id`).then((rows) => ['parent', col, rows]));
+    parts.push(`'c:${col}', (select coalesce(json_agg(t order by t.created_at, t.id), '[]'::json) from (select ${selectList(spec.fields, ['"id"', '"extra"', ...(spec.fields.map(parseField).some((f) => f.column === 'created_at') ? [] : ['"created_at"'])])} from ${q(spec.table)}) t)`);
     for (const [field, child] of Object.entries(spec.children || {})) {
       const hasId = child.fields.includes('id');
-      jobs.push(db.unsafe(`select parent_id, ${selectList(child.fields.filter((f) => f !== 'id'), hasId ? ['"id"'] : [])} from ${q(child.table)} order by parent_id, position`)
-        .then((rows) => ['child', col, rows, field, child]));
+      parts.push(`'k:${col}:${field}', (select coalesce(json_agg(t order by t.parent_id, t.position), '[]'::json) from (select ${selectList(child.fields.filter((f) => f !== 'id'), ['"parent_id"', '"position"', ...(hasId ? ['"id"'] : [])])} from ${q(child.table)}) t)`);
     }
   }
-  const settingsJob = readSettings(db);
-  const results = await Promise.all(jobs);
-  const state = await settingsJob;
+  return `select json_build_object(${parts.join(',\n')}) as data`;
+}
 
-  const kids = {};
-  for (const [kind, col, rows, field, child] of results) {
-    if (kind !== 'child') continue;
-    const map = new Map();
-    for (const r of rows) {
-      const item = rowFromDb(r, child.fields.filter((f) => f !== 'id'));
-      if (!child.fields.includes('id')) delete item.id;
-      if (!map.has(r.parent_id)) map.set(r.parent_id, []);
-      map.get(r.parent_id).push(item);
-    }
-    (kids[col] ||= {})[field] = map;
+export async function readAll(db) {
+  readAllSql ||= buildReadAllSql();
+  const [{ data }] = await db.unsafe(readAllSql);
+  const doc = typeof data === 'string' ? JSON.parse(data) : data;
+
+  const state = { masjid: null, chitty: null, accountHeads: doc['s:accountHeads'] || [] };
+  for (const [key, spec] of Object.entries(SETTING_SPEC)) {
+    const r = doc[`s:${key}`];
+    if (r) { state[key] = rowFromDb(r, spec.fields); delete state[key].id; }
   }
-  for (const [kind, col, rows] of results) {
-    if (kind !== 'parent') continue;
-    const spec = COLLECTION_SPEC[col];
-    state[col] = rows.map((r) => {
+  for (const [col, spec] of Object.entries(COLLECTION_SPEC)) {
+    const kids = {};
+    for (const [field, child] of Object.entries(spec.children || {})) {
+      const map = new Map();
+      for (const r of doc[`k:${col}:${field}`] || []) {
+        const item = rowFromDb(r, child.fields.filter((f) => f !== 'id'));
+        if (!child.fields.includes('id')) delete item.id;
+        if (!map.has(r.parent_id)) map.set(r.parent_id, []);
+        map.get(r.parent_id).push(item);
+      }
+      kids[field] = map;
+    }
+    state[col] = (doc[`c:${col}`] || []).map((r) => {
       const obj = rowFromDb(r, spec.fields);
-      for (const field of Object.keys(spec.children || {})) obj[field] = kids[col]?.[field]?.get(r.id) || [];
+      for (const field of Object.keys(spec.children || {})) obj[field] = kids[field].get(r.id) || [];
       return obj;
     });
   }
