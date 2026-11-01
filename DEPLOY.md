@@ -32,5 +32,5 @@ git push -u origin main
 Every `git push` to `main` now redeploys automatically; pushes to other branches get preview URLs.
 
 ## Notes
-- `vercel.json` pins the functions to Mumbai (`bom1`). Change it if your Supabase project is elsewhere: keep the two close together.
+- `vercel.json` pins the functions to Dublin (`dub1`), next to the Supabase project in eu-west-1 (Ireland). Change it if your Supabase project is elsewhere: keep the two close together.
 - Uploaded images (receipts, screenshots, photos) are compressed and stored inside the database rows. If uploads grow large, move them to Supabase Storage.
